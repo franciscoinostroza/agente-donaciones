@@ -28,6 +28,20 @@ db.exec(`
     contenido   TEXT NOT NULL,
     fecha       TEXT DEFAULT (datetime('now', 'localtime'))
   );
+
+  CREATE TABLE IF NOT EXISTS empresas_guardadas (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    nicho           TEXT NOT NULL,
+    nombre          TEXT NOT NULL,
+    sitio_web       TEXT,
+    email           TEXT,
+    tiene_rse       INTEGER DEFAULT 0,
+    nota_email      TEXT,
+    idea_referencia TEXT,
+    asunto          TEXT,
+    cuerpo          TEXT,
+    fecha           TEXT DEFAULT (datetime('now', 'localtime'))
+  );
 `);
 
 module.exports = {
@@ -66,4 +80,28 @@ module.exports = {
 
   deleteEmailReferencia: (id) =>
     db.prepare('DELETE FROM emails_referencia WHERE id = ?').run(id),
+
+  getEmpresasGuardadas: (nicho) =>
+    nicho
+      ? db.prepare('SELECT * FROM empresas_guardadas WHERE lower(nicho) = lower(?) ORDER BY fecha DESC').all(nicho)
+      : db.prepare('SELECT * FROM empresas_guardadas ORDER BY fecha DESC').all(),
+
+  getNombresGuardados: (nicho) =>
+    db.prepare('SELECT nombre FROM empresas_guardadas WHERE lower(nicho) = lower(?)').all(nicho).map(r => r.nombre),
+
+  addEmpresaGuardada: (data) => {
+    const exists = db.prepare(
+      'SELECT id FROM empresas_guardadas WHERE lower(nicho) = lower(?) AND lower(nombre) = lower(?)'
+    ).get(data.nicho, data.nombre);
+    if (exists) return exists.id;
+    return db.prepare(`
+      INSERT INTO empresas_guardadas
+        (nicho, nombre, sitio_web, email, tiene_rse, nota_email, idea_referencia, asunto, cuerpo)
+      VALUES
+        (@nicho, @nombre, @sitio_web, @email, @tiene_rse, @nota_email, @idea_referencia, @asunto, @cuerpo)
+    `).run(data).lastInsertRowid;
+  },
+
+  deleteEmpresaGuardada: (id) =>
+    db.prepare('DELETE FROM empresas_guardadas WHERE id = ?').run(id),
 };

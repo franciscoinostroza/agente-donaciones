@@ -40,6 +40,7 @@ async function buscar() {
 
     hideStatus();
     renderResultados(data.resultados, nicho);
+    renderGuardadas(data.guardadasPrevias || [], nicho);
   } catch (err) {
     showStatus('error', `❌ ${err.message}`);
   } finally {
@@ -97,6 +98,108 @@ function renderResultados(empresas, nicho) {
     `;
     resultados.appendChild(card);
   });
+}
+
+/* ─── Guardadas ─────────────────────────────────────────────── */
+function renderGuardadas(empresas, nicho) {
+  const section = document.getElementById('guardadas-section');
+  const grid    = document.getElementById('guardadas-grid');
+
+  if (!empresas.length) { section.classList.add('hidden'); return; }
+
+  document.getElementById('guardadas-nicho-label').textContent = nicho;
+  document.getElementById('guardadas-count').textContent =
+    `${empresas.length} empresa${empresas.length !== 1 ? 's' : ''}`;
+
+  grid.innerHTML = '';
+  empresas.forEach(e => {
+    const card = document.createElement('div');
+    card.className = 'empresa-card guardada';
+    card.id = `guardada-card-${e.id}`;
+    card.innerHTML = `
+      <div class="empresa-header">
+        <div>
+          <div class="empresa-nombre">${esc(e.nombre)}</div>
+          <div class="empresa-meta">
+            ${e.sitio_web ? `<a href="${esc(e.sitio_web)}" target="_blank" rel="noopener">🌐 ${esc(e.sitio_web)}</a>` : ''}
+            ${e.email ? ` &nbsp;|&nbsp; 📧 ${esc(e.email)}` : ''}
+          </div>
+        </div>
+        ${e.tiene_rse ? '<span class="badge-rse">✅ Tiene RSE</span>' : ''}
+      </div>
+      <div class="empresa-body">
+        <div class="idea-box">
+          <strong>💡 Idea de referencia</strong>
+          <p>${esc(e.idea_referencia)}</p>
+        </div>
+        <div class="email-section">
+          <label>Asunto</label>
+          <div class="asunto-box">${esc(e.asunto)}</div>
+          <label>Cuerpo del email</label>
+          <textarea class="cuerpo-textarea" id="cuerpo-g-${e.id}">${esc(e.cuerpo)}</textarea>
+          ${e.nota_email ? `<div class="nota-email">ℹ️ ${esc(e.nota_email)}</div>` : ''}
+        </div>
+        <div class="card-actions">
+          <button class="btn-sm btn-copy" onclick="copiarGuardada(${e.id})">📋 Copiar email</button>
+          <button class="btn-sm btn-send" onclick="marcarEnviadaGuardada(${e.id}, ${JSON.stringify(e).replace(/"/g, '&quot;')}, '${esc(nicho)}')">✅ Marcar como enviada</button>
+          <button class="btn-sm btn-danger" onclick="eliminarGuardada(${e.id})">🗑️ Quitar</button>
+        </div>
+      </div>
+    `;
+    grid.appendChild(card);
+  });
+
+  section.classList.remove('hidden');
+}
+
+function copiarGuardada(id) {
+  const textarea = document.getElementById(`cuerpo-g-${id}`);
+  navigator.clipboard.writeText(textarea.value).then(() => {
+    const btn = document.querySelector(`[onclick="copiarGuardada(${id})"]`);
+    const orig = btn.textContent;
+    btn.textContent = '✅ Copiado';
+    setTimeout(() => { btn.textContent = orig; }, 2000);
+  });
+}
+
+async function marcarEnviadaGuardada(id, e, nicho) {
+  const textarea = document.getElementById(`cuerpo-g-${id}`);
+  const payload = {
+    empresa: e.nombre,
+    nicho,
+    sitio_web: e.sitio_web || '',
+    email_empresa: e.email || '',
+    asunto: e.asunto || '',
+    cuerpo: textarea.value,
+    idea_referencia: e.idea_referencia || '',
+    estado: 'enviado',
+  };
+  try {
+    await fetch('/api/historial', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const btn = document.querySelector(`[onclick*="marcarEnviadaGuardada(${id},"]`);
+    btn.textContent = '✅ Guardada en historial';
+    btn.disabled = true;
+  } catch (err) {
+    alert('No se pudo guardar: ' + err.message);
+  }
+}
+
+async function eliminarGuardada(id) {
+  if (!confirm('¿Quitar esta empresa de las guardadas?')) return;
+  await fetch(`/api/empresas-guardadas/${id}`, { method: 'DELETE' });
+  const card = document.getElementById(`guardada-card-${id}`);
+  if (card) card.remove();
+  const remaining = document.querySelectorAll('.empresa-card.guardada').length;
+  if (!remaining) {
+    document.getElementById('guardadas-section').classList.add('hidden');
+  } else {
+    document.getElementById('guardadas-count').textContent =
+      `${remaining} empresa${remaining !== 1 ? 's' : ''}`;
+  }
 }
 
 /* ─── Copiar email ──────────────────────────────────────────── */

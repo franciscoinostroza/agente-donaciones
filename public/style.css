@@ -458,6 +458,28 @@ tr:hover td { background: rgba(255,255,255,.02); }
   width: 14px;
 }
 
+/* ─── Guardadas section ──────────────────────────────────────── */
+.guardadas-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 32px 0 14px;
+  padding: 0 2px;
+}
+.guardadas-titulo {
+  font-size: .9rem;
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: -.01em;
+}
+.guardadas-titulo span { color: var(--primary); }
+.empresa-card.guardada .empresa-header {
+  background: linear-gradient(135deg, rgba(148,163,184,.1) 0%, rgba(100,116,139,.07) 100%);
+  border-bottom-color: rgba(148,163,184,.15);
+}
+
 /* ─── Responsive ─────────────────────────────────────────────── */
 @media (max-width: 600px) {
   .card { padding: 18px 16px; }
