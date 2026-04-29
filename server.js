@@ -6,8 +6,7 @@ const db = require('./database');
 
 const app = express();
 const openai = new OpenAI({
-  apiKey: process.env.DEEPSEEK_API_KEY,
-  baseURL: 'https://api.deepseek.com',
+  apiKey: process.env.OPENAI_API_KEY,
 });
 
 app.use(express.json({ limit: '2mb' }));
@@ -41,7 +40,7 @@ app.post('/api/audio', async (req, res) => {
     const { texto } = req.body;
     if (!texto) return res.status(400).json({ error: 'Texto requerido.' });
 
-    return res.status(501).json({ error: 'TTS no disponible con DeepSeek. Usá la lectura del navegador.' });
+    return res.status(501).json({ error: 'TTS no configurado.' });
   } catch (err) {
     console.error('[/api/audio]', err.message);
     res.status(500).json({ error: err.message });
@@ -114,7 +113,7 @@ Devolvé ÚNICAMENTE un JSON válido con este formato exacto, sin texto adiciona
   try {
     // Usar Responses API con búsqueda web integrada
     const response = await openai.responses.create({
-      model: 'deepseek-chat',
+      model: 'gpt-4o-mini',
       tools: [{ type: 'web_search_preview' }],
       input: prompt,
     });
@@ -123,7 +122,7 @@ Devolvé ÚNICAMENTE un JSON válido con este formato exacto, sin texto adiciona
     console.warn('Web search no disponible, usando GPT-4o sin búsqueda:', searchErr.message);
     // Fallback a chat completions sin búsqueda
     const completion = await openai.chat.completions.create({
-      model: 'deepseek-chat',
+      model: 'gpt-4o-mini',
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.3,
     });
@@ -168,7 +167,7 @@ Devolvé ÚNICAMENTE un JSON válido, sin texto adicional ni bloques de código:
 }`;
 
   const completion = await openai.chat.completions.create({
-    model: 'deepseek-chat',
+    model: 'gpt-4o-mini',
     messages: [{ role: 'user', content: prompt }],
     temperature: 0.75,
   });
