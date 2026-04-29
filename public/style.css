@@ -1,8 +1,8 @@
 /* ─── Variables ─────────────────────────────────────────────── */
 :root {
-  --primary:    #f97316;
-  --primary-dk: #ea6c0a;
-  --primary-lt: rgba(249,115,22,.15);
+  --primary:    #2563eb;
+  --primary-dk: #1d4ed8;
+  --primary-lt: rgba(37,99,235,.15);
   --bg:         #0f172a;
   --bg2:        #1e293b;
   --surface:    #1e293b;
@@ -59,7 +59,7 @@ header {
   height: 44px;
   border-radius: 10px;
   object-fit: cover;
-  border: 2px solid rgba(249,115,22,.4);
+  border: 2px solid rgba(37,99,235,.4);
 }
 .logo h1 {
   font-size: 1.05rem;
@@ -134,7 +134,7 @@ main { max-width: 980px; margin: 0 auto; padding: 28px 16px 56px; }
 }
 .search-row input:focus {
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(249,115,22,.15);
+  box-shadow: 0 0 0 3px rgba(37,99,235,.15);
 }
 .search-row input::placeholder { color: #475569; }
 
@@ -152,7 +152,7 @@ main { max-width: 980px; margin: 0 auto; padding: 28px 16px 56px; }
   transition: background .15s, transform .1s, box-shadow .15s;
   letter-spacing: -.01em;
 }
-.btn-primary:hover   { background: var(--primary-dk); box-shadow: 0 2px 12px rgba(249,115,22,.4); }
+.btn-primary:hover   { background: var(--primary-dk); box-shadow: 0 2px 12px rgba(37,99,235,.4); }
 .btn-primary:active  { transform: scale(.97); }
 .btn-primary:disabled { opacity: .4; cursor: not-allowed; box-shadow: none; }
 
@@ -181,7 +181,7 @@ main { max-width: 980px; margin: 0 auto; padding: 28px 16px 56px; }
   border-radius: var(--radius-sm);
   font-size: .875rem;
 }
-.status.loading { background: rgba(249,115,22,.12); color: #fdba74; border: 1px solid rgba(249,115,22,.25); }
+.status.loading { background: rgba(37,99,235,.12); color: #fdba74; border: 1px solid rgba(37,99,235,.25); }
 .status.error   { background: rgba(239,68,68,.12);  color: #fca5a5; border: 1px solid rgba(239,68,68,.25); }
 .hidden { display: none !important; }
 
@@ -197,8 +197,8 @@ main { max-width: 980px; margin: 0 auto; padding: 28px 16px 56px; }
   overflow: hidden;
 }
 .empresa-header {
-  background: linear-gradient(135deg, rgba(249,115,22,.18) 0%, rgba(251,146,60,.1) 100%);
-  border-bottom: 1px solid rgba(249,115,22,.2);
+  background: linear-gradient(135deg, rgba(37,99,235,.18) 0%, rgba(59,130,246,.1) 100%);
+  border-bottom: 1px solid rgba(37,99,235,.2);
   padding: 18px 24px;
   display: flex;
   justify-content: space-between;
@@ -223,8 +223,8 @@ main { max-width: 980px; margin: 0 auto; padding: 28px 16px 56px; }
 .empresa-body { padding: 20px 24px; }
 
 .idea-box {
-  background: rgba(249,115,22,.08);
-  border: 1px solid rgba(249,115,22,.2);
+  background: rgba(37,99,235,.08);
+  border: 1px solid rgba(37,99,235,.2);
   border-left: 3px solid var(--primary);
   border-radius: var(--radius-sm);
   margin-bottom: 20px;
@@ -448,7 +448,7 @@ tr:hover td { background: rgba(255,255,255,.02); }
 @keyframes spin { to { transform: rotate(360deg); } }
 .spinner {
   animation: spin .8s linear infinite;
-  border: 2.5px solid rgba(249,115,22,.25);
+  border: 2.5px solid rgba(37,99,235,.25);
   border-top-color: var(--primary);
   border-radius: 50%;
   display: inline-block;
