@@ -538,6 +538,37 @@ tr:hover td { background: rgba(255,255,255,.02); }
   border-bottom-color: rgba(148,163,184,.15);
 }
 
+/* ─── Sin web search ─────────────────────────────────────────── */
+.sin-web-search {
+  text-align: center;
+  padding: 36px 24px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.sin-web-search-icon { font-size: 2.4rem; margin-bottom: 12px; }
+.sin-web-search h3 { font-size: 1.1rem; font-weight: 600; margin-bottom: 8px; }
+.sin-web-search p { color: var(--muted); margin-bottom: 4px; }
+.sin-web-search-sub { font-weight: 500; color: var(--text) !important; margin-top: 20px !important; }
+.sin-web-search-lista {
+  list-style: none;
+  padding: 0;
+  margin: 12px auto 0;
+  max-width: 420px;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.sin-web-search-lista li {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: .9rem;
+  color: var(--text);
+}
+
 /* ─── Responsive ─────────────────────────────────────────────── */
 @media (max-width: 600px) {
   .card { padding: 18px 16px; }

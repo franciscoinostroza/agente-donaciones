@@ -25,20 +25,34 @@ app.post('/api/buscar', async (req, res) => {
     const nombresYaBuscados = guardadasPrevias.map(e => e.nombre);
 
     const empresas = await buscarEmpresas(nichoNorm, zonaNorm, nombresYaBuscados);
-    if (!empresas.length) return res.status(404).json({ error: 'No se encontraron empresas. Intentá con otro nicho.' });
+
+    if (empresas && empresas.error === 'sin_web_search') {
+      return res.json({ error: 'sin_web_search', sugerencias: empresas.sugerencias || [], zona: zonaNorm });
+    }
+
+    if (!Array.isArray(empresas) || !empresas.length) return res.status(404).json({ error: 'No se encontraron empresas. Intentá con otro nicho.' });
 
     const resultados = empresas.map(e => ({
-      nombre:    e.nombre,
-      sitio_web: e.sitio_web || '',
-      email:     e.email     || '',
-      tiene_rse: e.tiene_rse || false,
-      nota_email: e.nota_email || '',
+      nombre:          e.nombre,
+      sitio_web:       e.sitio_web       || null,
+      email:           e.email           || null,
+      tiene_rse:       e.tiene_rse       ?? null,
+      direccion:       e.direccion       || null,
+      telefono:        e.telefono        || null,
+      contacto_nombre: e.contacto_nombre || null,
+      fuente:          e.fuente          || null,
       guardadaId: db.addEmpresaGuardada({
         nicho: nichoNorm, zona: zonaNorm,
-        nombre: e.nombre, sitio_web: e.sitio_web || '',
-        email: e.email || '', tiene_rse: e.tiene_rse ? 1 : 0,
-        nota_email: e.nota_email || '',
+        nombre: e.nombre,
+        sitio_web:       e.sitio_web       || null,
+        email:           e.email           || null,
+        tiene_rse:       e.tiene_rse ? 1 : 0,
+        nota_email:      null,
         idea_referencia: '', asunto: '', cuerpo: '',
+        direccion:       e.direccion       || null,
+        telefono:        e.telefono        || null,
+        contacto_nombre: e.contacto_nombre || null,
+        fuente:          e.fuente          || null,
       }),
     }));
 
@@ -139,56 +153,79 @@ app.delete('/api/emails-referencia/:id', (req, res) => {
 
 async function buscarEmpresas(nicho, zona, nombresYaBuscados = []) {
   const exclusionText = nombresYaBuscados.length
-    ? `\n\nIMPORTANTE: Las siguientes empresas ya fueron buscadas antes para este rubro y zona. NO las incluyas, encontrá empresas DISTINTAS:\n${nombresYaBuscados.slice(0, 20).join(', ')}`
+    ? `\n\nIMPORTANTE: Las siguientes empresas ya fueron buscadas antes. NO las incluyas, encontrá empresas DISTINTAS:\n${nombresYaBuscados.slice(0, 20).join(', ')}`
     : '';
 
-  const prompt = `Buscá en internet entre 6 y 8 empresas REALES del rubro "${nicho}" en ${zona}, Argentina.${exclusionText}
+  const systemPrompt = `Eres un asistente que busca empresas reales en Argentina para solicitudes de donación.`;
 
-Para cada empresa intentá encontrar:
-- Nombre real de la empresa
-- Sitio web oficial
-- Email de contacto (de RRHH, RSE, donaciones, o contacto general)
-- Si tienen programa de RSE activo
+  const userMessage = `Buscá en internet entre 6 y 8 empresas REALES del rubro "${nicho}" en "${zona}", Argentina.${exclusionText}
 
-Devolvé ÚNICAMENTE un JSON válido con este formato exacto, sin texto adicional ni bloques de código:
+REGLAS ESTRICTAS:
+- Solo incluí empresas que encontraste en una fuente web real (Google Maps, sitio oficial, redes sociales, directorios como Páginas Amarillas, Guía Oleo, etc.)
+- Si no encontrás email real, poné null. NUNCA inventes un email.
+- Si no encontrás nombre de contacto, poné null. NUNCA lo inventes.
+- Cada empresa debe tener al menos nombre + dirección verificada.
+
+Para cada empresa devolvé este JSON exacto:
 {
-  "empresas": [
-    {
-      "nombre": "Nombre Empresa SA",
-      "sitio_web": "https://www.empresa.com.ar",
-      "email": "contacto@empresa.com.ar",
-      "tiene_rse": true,
-      "nota_email": "Aclaración si no hay email directo disponible"
-    }
-  ]
-}`;
+  nombre: string,
+  direccion: string,
+  telefono: string | null,
+  email: string | null,
+  sitio_web: string | null,
+  contacto_nombre: string | null,
+  fuente: string,
+  tiene_rse: boolean | null
+}
 
-  let text;
+Devolvé SOLO un array JSON válido, sin texto adicional, sin markdown, sin explicaciones.`;
 
   try {
-    // Usar Responses API con búsqueda web integrada
     const response = await openai.responses.create({
       model: 'gpt-4o-mini',
       tools: [{ type: 'web_search_preview' }],
-      input: prompt,
+      instructions: systemPrompt,
+      input: userMessage,
     });
-    text = response.output_text;
+    const text = response.output_text;
+    const match = text.match(/\[[\s\S]*\]/);
+    if (!match) throw new Error('La IA no devolvió un array JSON válido.');
+    return JSON.parse(match[0]);
   } catch (searchErr) {
-    console.warn('Web search no disponible, usando GPT-4o sin búsqueda:', searchErr.message);
-    // Fallback a chat completions sin búsqueda
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [{ role: 'user', content: prompt }],
-      temperature: 0.3,
-    });
-    text = completion.choices[0].message.content;
+    console.warn('Web search no disponible:', searchErr.message);
+
+    const fallbackSystem = `Eres un asistente honesto. En este momento NO tenés acceso a internet para buscar empresas reales de "${nicho}" en "${zona}", Argentina.
+
+NO inventes empresas, direcciones, teléfonos ni emails.`;
+
+    const fallbackUser = `Devolvé SOLO este JSON válido, con comillas dobles en todas las claves y valores:
+{"error":"sin_web_search","mensaje":"No pude buscar empresas en tiempo real.","sugerencias":["Buscá ${nicho} ${zona} en Google Maps","Revisá Páginas Amarillas Argentina: paginasamarillas.com.ar","Buscá en el directorio de tu municipio local","Consultá grupos de Facebook de comercios de ${zona}"]}`;
+
+    try {
+      const completion = await openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        messages: [
+          { role: 'system', content: fallbackSystem },
+          { role: 'user', content: fallbackUser },
+        ],
+        temperature: 0,
+      });
+      const fallbackText = completion.choices[0].message.content;
+      const match = fallbackText.match(/\{[\s\S]*\}/);
+      if (match) return JSON.parse(match[0]);
+    } catch (_) {}
+
+    return {
+      error: 'sin_web_search',
+      mensaje: 'No pude buscar empresas en tiempo real.',
+      sugerencias: [
+        `Buscá "${nicho} ${zona}" en Google Maps`,
+        'Revisá Páginas Amarillas Argentina: paginasamarillas.com.ar',
+        'Buscá en el directorio de tu municipio local',
+        `Consultá grupos de Facebook de comercios de ${zona}`,
+      ],
+    };
   }
-
-  const match = text.match(/\{[\s\S]*\}/);
-  if (!match) throw new Error('La IA no devolvió un JSON válido al buscar empresas.');
-
-  const data = JSON.parse(match[0]);
-  return Array.isArray(data.empresas) ? data.empresas : [];
 }
 
 async function generarEmail(empresa, nicho, emailsReferencia) {

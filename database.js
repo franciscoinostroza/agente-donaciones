@@ -45,8 +45,12 @@ db.exec(`
   );
 `);
 
-// Migración: agregar columna zona si no existe (para DBs previas)
+// Migraciones para DBs previas
 try { db.exec(`ALTER TABLE empresas_guardadas ADD COLUMN zona TEXT NOT NULL DEFAULT ''`); } catch (_) {}
+try { db.exec(`ALTER TABLE empresas_guardadas ADD COLUMN direccion TEXT`); } catch (_) {}
+try { db.exec(`ALTER TABLE empresas_guardadas ADD COLUMN telefono TEXT`); } catch (_) {}
+try { db.exec(`ALTER TABLE empresas_guardadas ADD COLUMN contacto_nombre TEXT`); } catch (_) {}
+try { db.exec(`ALTER TABLE empresas_guardadas ADD COLUMN fuente TEXT`); } catch (_) {}
 
 module.exports = {
   getHistorial: () =>
@@ -102,9 +106,11 @@ module.exports = {
     if (exists) return exists.id;
     return db.prepare(`
       INSERT INTO empresas_guardadas
-        (nicho, zona, nombre, sitio_web, email, tiene_rse, nota_email, idea_referencia, asunto, cuerpo)
+        (nicho, zona, nombre, sitio_web, email, tiene_rse, nota_email, idea_referencia, asunto, cuerpo,
+         direccion, telefono, contacto_nombre, fuente)
       VALUES
-        (@nicho, @zona, @nombre, @sitio_web, @email, @tiene_rse, @nota_email, @idea_referencia, @asunto, @cuerpo)
+        (@nicho, @zona, @nombre, @sitio_web, @email, @tiene_rse, @nota_email, @idea_referencia, @asunto, @cuerpo,
+         @direccion, @telefono, @contacto_nombre, @fuente)
     `).run(data).lastInsertRowid;
   },
 

@@ -57,6 +57,11 @@ async function buscar() {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Error desconocido');
 
+    if (data.error === 'sin_web_search') {
+      renderSinWebSearch(nicho, data.sugerencias || []);
+      return;
+    }
+
     _resultados = data.resultados;
     _guardadas  = data.guardadasPrevias || [];
     _nicho      = nicho;
@@ -78,6 +83,22 @@ function showStatus(type, html) {
   statusEl.classList.remove('hidden');
 }
 function hideStatus() { statusEl.classList.add('hidden'); }
+
+/* ─── Sin web search: mostrar sugerencias ───────────────────── */
+function renderSinWebSearch(nicho, sugerencias) {
+  hideStatus();
+  resultados.innerHTML = `
+    <div class="sin-web-search">
+      <div class="sin-web-search-icon">🔌</div>
+      <h3>Búsqueda web no disponible</h3>
+      <p>No se pudo acceder a internet para buscar empresas de <strong>${esc(nicho)}</strong> en tiempo real.</p>
+      <p class="sin-web-search-sub">Podés buscarlas manualmente:</p>
+      <ul class="sin-web-search-lista">
+        ${sugerencias.map(s => `<li>${esc(s)}</li>`).join('')}
+      </ul>
+    </div>
+  `;
+}
 
 /* ─── Render resultados (sin email aún) ─────────────────────── */
 function renderResultados(empresas) {
