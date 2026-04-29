@@ -19,11 +19,13 @@
 
 /* ─── Reset ─────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { overflow-x: hidden; }
 body {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   background: var(--bg);
   color: var(--text);
   min-height: 100vh;
+  overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -462,4 +464,7 @@ tr:hover td { background: rgba(255,255,255,.02); }
   .empresa-header { padding: 14px 16px; }
   .tab-btn { padding: 12px 10px; font-size: .81rem; }
   main { padding: 20px 12px 48px; }
+  .search-row { flex-direction: column; }
+  .search-row input { min-width: unset; width: 100%; }
+  .search-row .btn-primary { width: 100%; }
 }
