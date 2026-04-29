@@ -28,6 +28,7 @@
 
   <nav class="tabs">
     <button class="tab-btn active" data-tab="buscar">🔍 Buscar empresas</button>
+    <button class="tab-btn" data-tab="guardadas">📁 Guardadas</button>
     <button class="tab-btn" data-tab="historial">📋 Historial</button>
     <button class="tab-btn" data-tab="mis-emails">✉️ Mis emails</button>
   </nav>
@@ -65,6 +66,19 @@
         </div>
         <div id="guardadas-grid" class="resultados-grid"></div>
       </div>
+    </section>
+
+    <!-- ── TAB: GUARDADAS ── -->
+    <section id="tab-guardadas" class="tab-content">
+      <div class="card">
+        <div class="historial-header">
+          <h2>Empresas guardadas</h2>
+          <div id="guardadas-tab-stats" class="stats-row"></div>
+        </div>
+        <input id="guardadas-tab-filtro" type="text" placeholder="Filtrar por empresa, rubro o zona…" class="filtro-input" />
+      </div>
+      <div id="guardadas-tab-grid" class="resultados-grid"></div>
+      <p id="guardadas-tab-vacio" class="empty-msg hidden">Todavía no hay empresas guardadas. Buscá un rubro para empezar.</p>
     </section>
 
     <!-- ── TAB: HISTORIAL ── -->

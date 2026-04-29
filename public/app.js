@@ -5,8 +5,9 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     document.querySelectorAll('.tab-content').forEach(s => s.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById(`tab-${btn.dataset.tab}`).classList.add('active');
-    if (btn.dataset.tab === 'historial') loadHistorial();
+    if (btn.dataset.tab === 'historial')  loadHistorial();
     if (btn.dataset.tab === 'mis-emails') loadRefs();
+    if (btn.dataset.tab === 'guardadas')  loadGuardadasTab();
   });
 });
 
@@ -22,10 +23,11 @@ document.querySelectorAll('.zona-chip').forEach(chip => {
 });
 
 /* ─── Estado global de búsqueda ─────────────────────────────── */
-let _resultados = [];
-let _guardadas  = [];
-let _nicho      = '';
-let _zona       = '';
+let _resultados     = [];
+let _guardadas      = [];
+let _todasGuardadas = [];
+let _nicho          = '';
+let _zona           = '';
 
 /* ─── Buscar ────────────────────────────────────────────────── */
 const nichInput  = document.getElementById('nicho-input');
@@ -184,7 +186,12 @@ async function generarEmailCard(tipo, index) {
   try {
     const empresa = tipo === 'r'
       ? _resultados[index]
-      : _guardadas.find(e => e.id === index);
+      : tipo === 'g'
+      ? _guardadas.find(e => e.id === index)
+      : _todasGuardadas.find(e => e.id === index);
+
+    const nicho = tipo === 't' ? empresa.nicho : _nicho;
+    const zona  = tipo === 't' ? empresa.zona  : _zona;
 
     const refs = await fetch('/api/emails-referencia').then(r => r.json());
     const res  = await fetch('/api/generar-email', {
@@ -192,8 +199,8 @@ async function generarEmailCard(tipo, index) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         empresa,
-        nicho: _nicho,
-        zona: _zona,
+        nicho,
+        zona,
         guardadaId: empresa.guardadaId ?? empresa.id,
         emailsReferencia: refs,
       }),
@@ -261,12 +268,14 @@ async function escuchar(textareaId, btnId, asunto) {
 async function marcarEnviadoCard(tipo, index, btn) {
   const empresa = tipo === 'r'
     ? _resultados[index]
-    : _guardadas.find(e => e.id === index);
+    : tipo === 'g'
+    ? _guardadas.find(e => e.id === index)
+    : _todasGuardadas.find(e => e.id === index);
   const textarea = document.getElementById(`cuerpo-${tipo}-${index}`);
 
   const payload = {
     empresa: empresa.nombre,
-    nicho:   _nicho,
+    nicho:   tipo === 't' ? empresa.nicho : _nicho,
     sitio_web:    empresa.sitio_web    || '',
     email_empresa: empresa.email       || '',
     asunto:       empresa.asunto       || '',
@@ -300,6 +309,81 @@ async function eliminarGuardada(id) {
     document.getElementById('guardadas-count').textContent =
       `${remaining} empresa${remaining !== 1 ? 's' : ''}`;
   }
+}
+
+/* ─── Tab Guardadas ─────────────────────────────────────────── */
+async function loadGuardadasTab() {
+  _todasGuardadas = await fetch('/api/empresas-guardadas').then(r => r.json());
+  renderGuardadasTab(_todasGuardadas);
+
+  document.getElementById('guardadas-tab-filtro').oninput = function () {
+    const q = this.value.toLowerCase();
+    renderGuardadasTab(_todasGuardadas.filter(e =>
+      (e.nombre || '').toLowerCase().includes(q) ||
+      (e.nicho  || '').toLowerCase().includes(q) ||
+      (e.zona   || '').toLowerCase().includes(q)
+    ));
+  };
+}
+
+function renderGuardadasTab(empresas) {
+  const grid  = document.getElementById('guardadas-tab-grid');
+  const vacio = document.getElementById('guardadas-tab-vacio');
+  const stats = document.getElementById('guardadas-tab-stats');
+
+  const total  = _todasGuardadas.length;
+  const nichos = [...new Set(_todasGuardadas.map(e => e.nicho).filter(Boolean))].length;
+  stats.innerHTML = `
+    <span class="stat-chip">📁 ${total} empresa${total !== 1 ? 's' : ''}</span>
+    <span class="stat-chip">🏷️ ${nichos} rubro${nichos !== 1 ? 's' : ''}</span>
+  `;
+
+  if (!empresas.length) {
+    grid.innerHTML = '';
+    vacio.classList.remove('hidden');
+    return;
+  }
+  vacio.classList.add('hidden');
+  grid.innerHTML = '';
+
+  empresas.forEach(e => {
+    const card = document.createElement('div');
+    card.className = 'empresa-card guardada';
+    card.id = `tab-card-${e.id}`;
+    card.innerHTML = `
+      <div class="empresa-header">
+        <div>
+          <div class="empresa-nombre">${esc(e.nombre)}</div>
+          <div class="empresa-meta">
+            ${e.sitio_web ? `<a class="empresa-web-btn" href="${esc(e.sitio_web)}" target="_blank" rel="noopener">🌐 Sitio web</a>` : ''}
+            ${e.email ? `<span class="empresa-email-tag">📧 ${esc(e.email)}</span>` : ''}
+          </div>
+          <div class="empresa-tags">
+            <span class="tag-nicho">${esc(e.nicho)}</span>
+            ${e.zona ? `<span class="tag-zona">${esc(e.zona)}</span>` : ''}
+          </div>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+          ${e.tiene_rse ? '<span class="badge-rse">✅ Tiene RSE</span>' : ''}
+          <button class="btn-sm btn-danger" onclick="eliminarGuardadaTab(${e.id})">🗑️</button>
+        </div>
+      </div>
+      <div class="empresa-body" id="body-t-${e.id}">
+        ${e.asunto
+          ? renderEmailArea('t', e.id, e)
+          : renderEmailPlaceholder('t', e.id, e.nota_email)}
+      </div>
+    `;
+    grid.appendChild(card);
+  });
+}
+
+async function eliminarGuardadaTab(id) {
+  if (!confirm('¿Quitar esta empresa de las guardadas?')) return;
+  await fetch(`/api/empresas-guardadas/${id}`, { method: 'DELETE' });
+  _todasGuardadas = _todasGuardadas.filter(e => e.id !== id);
+  document.getElementById(`tab-card-${id}`)?.remove();
+  renderGuardadasTab(_todasGuardadas);
 }
 
 /* ─── Historial ─────────────────────────────────────────────── */

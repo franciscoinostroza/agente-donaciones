@@ -249,6 +249,15 @@ main { max-width: 980px; margin: 0 auto; padding: 28px 16px 56px; }
 }
 .empresa-web-btn:hover { background: rgba(249,115,22,.2); }
 .empresa-email-tag { color: var(--muted); font-size: .78rem; }
+.empresa-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px; }
+.tag-nicho, .tag-zona {
+  border-radius: 20px;
+  font-size: .7rem;
+  font-weight: 500;
+  padding: 2px 9px;
+}
+.tag-nicho { background: rgba(249,115,22,.12); color: var(--primary); border: 1px solid rgba(249,115,22,.2); }
+.tag-zona  { background: rgba(148,163,184,.1);  color: var(--muted);   border: 1px solid rgba(148,163,184,.2); }
 .badge-rse {
   background: var(--primary);
   color: #fff;
