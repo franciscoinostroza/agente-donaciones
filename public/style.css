@@ -78,6 +78,7 @@ header {
   background: var(--surface);
   border-bottom: 1px solid var(--border);
   display: flex;
+  justify-content: center;
   gap: 2px;
   padding: 0 24px;
   overflow-x: auto;
