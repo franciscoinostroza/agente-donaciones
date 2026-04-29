@@ -5,7 +5,10 @@ const path = require('path');
 const db = require('./database');
 
 const app = express();
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const openai = new OpenAI({
+  apiKey: process.env.DEEPSEEK_API_KEY,
+  baseURL: 'https://api.deepseek.com',
+});
 
 app.use(express.json({ limit: '2mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
@@ -38,15 +41,7 @@ app.post('/api/audio', async (req, res) => {
     const { texto } = req.body;
     if (!texto) return res.status(400).json({ error: 'Texto requerido.' });
 
-    const mp3 = await openai.audio.speech.create({
-      model: 'tts-1',
-      voice: 'nova',
-      input: texto.slice(0, 4096),
-    });
-
-    const buffer = Buffer.from(await mp3.arrayBuffer());
-    res.set('Content-Type', 'audio/mpeg');
-    res.send(buffer);
+    return res.status(501).json({ error: 'TTS no disponible con DeepSeek. Usá la lectura del navegador.' });
   } catch (err) {
     console.error('[/api/audio]', err.message);
     res.status(500).json({ error: err.message });
@@ -119,7 +114,7 @@ Devolvé ÚNICAMENTE un JSON válido con este formato exacto, sin texto adiciona
   try {
     // Usar Responses API con búsqueda web integrada
     const response = await openai.responses.create({
-      model: 'gpt-4o',
+      model: 'deepseek-chat',
       tools: [{ type: 'web_search_preview' }],
       input: prompt,
     });
@@ -128,7 +123,7 @@ Devolvé ÚNICAMENTE un JSON válido con este formato exacto, sin texto adiciona
     console.warn('Web search no disponible, usando GPT-4o sin búsqueda:', searchErr.message);
     // Fallback a chat completions sin búsqueda
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4o',
+      model: 'deepseek-chat',
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.3,
     });
@@ -173,7 +168,7 @@ Devolvé ÚNICAMENTE un JSON válido, sin texto adicional ni bloques de código:
 }`;
 
   const completion = await openai.chat.completions.create({
-    model: 'gpt-4o',
+    model: 'deepseek-chat',
     messages: [{ role: 'user', content: prompt }],
     temperature: 0.75,
   });
