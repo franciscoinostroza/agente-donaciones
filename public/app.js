@@ -21,6 +21,12 @@ document.querySelectorAll('.zona-chip').forEach(chip => {
   });
 });
 
+/* ─── Estado global de búsqueda ─────────────────────────────── */
+let _resultados = [];
+let _guardadas  = [];
+let _nicho      = '';
+let _zona       = '';
+
 /* ─── Buscar ────────────────────────────────────────────────── */
 const nichInput  = document.getElementById('nicho-input');
 const btnBuscar  = document.getElementById('btn-buscar');
@@ -36,22 +42,27 @@ async function buscar() {
 
   btnBuscar.disabled = true;
   resultados.innerHTML = '';
-  showStatus('loading', `<span class="spinner"></span>Buscando empresas de <strong>${nicho}</strong>… esto puede tardar 20–40 segundos.`);
+  document.getElementById('guardadas-section').classList.add('hidden');
+  showStatus('loading', `<span class="spinner"></span>Buscando empresas de <strong>${nicho}</strong> en <strong>${zonaSeleccionada}</strong>…`);
 
   try {
-    const refs = await fetch('/api/emails-referencia').then(r => r.json());
     const res = await fetch('/api/buscar', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ nicho, zona: zonaSeleccionada, emailsReferencia: refs }),
+      body: JSON.stringify({ nicho, zona: zonaSeleccionada }),
     });
 
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Error desconocido');
 
+    _resultados = data.resultados;
+    _guardadas  = data.guardadasPrevias || [];
+    _nicho      = nicho;
+    _zona       = data.zona || zonaSeleccionada;
+
     hideStatus();
-    renderResultados(data.resultados, nicho);
-    renderGuardadas(data.guardadasPrevias || [], nicho, data.zona || zonaSeleccionada);
+    renderResultados(_resultados);
+    renderGuardadas(_guardadas);
   } catch (err) {
     showStatus('error', `❌ ${err.message}`);
   } finally {
@@ -66,8 +77,8 @@ function showStatus(type, html) {
 }
 function hideStatus() { statusEl.classList.add('hidden'); }
 
-/* ─── Renderizar resultados ─────────────────────────────────── */
-function renderResultados(empresas, nicho) {
+/* ─── Render resultados (sin email aún) ─────────────────────── */
+function renderResultados(empresas) {
   resultados.innerHTML = '';
   empresas.forEach((e, i) => {
     const card = document.createElement('div');
@@ -83,42 +94,22 @@ function renderResultados(empresas, nicho) {
         </div>
         ${e.tiene_rse ? '<span class="badge-rse">✅ Tiene RSE</span>' : ''}
       </div>
-
-      <div class="empresa-body">
-        <div class="idea-box">
-          <strong>💡 Idea de referencia</strong>
-          <p>${esc(e.idea_referencia)}</p>
-        </div>
-
-        <div class="email-section">
-          <label>Asunto</label>
-          <div class="asunto-box">${esc(e.asunto)}</div>
-
-          <label>Cuerpo del email</label>
-          <textarea class="cuerpo-textarea" id="cuerpo-${i}">${esc(e.cuerpo)}</textarea>
-
-          ${e.nota_email ? `<div class="nota-email">ℹ️ ${esc(e.nota_email)}</div>` : ''}
-        </div>
-
-        <div class="card-actions">
-          <button class="btn-sm btn-copy" onclick="copiarEmail(${i})">📋 Copiar email</button>
-          <button class="btn-sm btn-audio" id="btn-audio-${i}" onclick="escuchar(${i}, '${esc(e.asunto)}')">🔊 Escuchar</button>
-          <button class="btn-sm btn-send" onclick="marcarEnviado(${i}, ${JSON.stringify(e).replace(/"/g, '&quot;')}, '${esc(nicho)}')">✅ Marcar como enviado</button>
-        </div>
+      <div class="empresa-body" id="body-r-${i}">
+        ${renderEmailPlaceholder('r', i, e.nota_email)}
       </div>
     `;
     resultados.appendChild(card);
   });
 }
 
-/* ─── Guardadas ─────────────────────────────────────────────── */
-function renderGuardadas(empresas, nicho, zona) {
+/* ─── Render guardadas ──────────────────────────────────────── */
+function renderGuardadas(empresas) {
   const section = document.getElementById('guardadas-section');
   const grid    = document.getElementById('guardadas-grid');
 
   if (!empresas.length) { section.classList.add('hidden'); return; }
 
-  document.getElementById('guardadas-nicho-label').textContent = zona ? `${nicho} · ${zona}` : nicho;
+  document.getElementById('guardadas-nicho-label').textContent = `${_nicho} · ${_zona}`;
   document.getElementById('guardadas-count').textContent =
     `${empresas.length} empresa${empresas.length !== 1 ? 's' : ''}`;
 
@@ -136,25 +127,15 @@ function renderGuardadas(empresas, nicho, zona) {
             ${e.email ? `<span class="empresa-email-tag">📧 ${esc(e.email)}</span>` : ''}
           </div>
         </div>
-        ${e.tiene_rse ? '<span class="badge-rse">✅ Tiene RSE</span>' : ''}
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+          ${e.tiene_rse ? '<span class="badge-rse">✅ Tiene RSE</span>' : ''}
+          <button class="btn-sm btn-danger" onclick="eliminarGuardada(${e.id})">🗑️</button>
+        </div>
       </div>
-      <div class="empresa-body">
-        <div class="idea-box">
-          <strong>💡 Idea de referencia</strong>
-          <p>${esc(e.idea_referencia)}</p>
-        </div>
-        <div class="email-section">
-          <label>Asunto</label>
-          <div class="asunto-box">${esc(e.asunto)}</div>
-          <label>Cuerpo del email</label>
-          <textarea class="cuerpo-textarea" id="cuerpo-g-${e.id}">${esc(e.cuerpo)}</textarea>
-          ${e.nota_email ? `<div class="nota-email">ℹ️ ${esc(e.nota_email)}</div>` : ''}
-        </div>
-        <div class="card-actions">
-          <button class="btn-sm btn-copy" onclick="copiarGuardada(${e.id})">📋 Copiar email</button>
-          <button class="btn-sm btn-send" onclick="marcarEnviadaGuardada(${e.id}, ${JSON.stringify(e).replace(/"/g, '&quot;')}, '${esc(nicho)}')">✅ Marcar como enviada</button>
-          <button class="btn-sm btn-danger" onclick="eliminarGuardada(${e.id})">🗑️ Quitar</button>
-        </div>
+      <div class="empresa-body" id="body-g-${e.id}">
+        ${e.asunto
+          ? renderEmailArea('g', e.id, e)
+          : renderEmailPlaceholder('g', e.id, e.nota_email)}
       </div>
     `;
     grid.appendChild(card);
@@ -163,61 +144,79 @@ function renderGuardadas(empresas, nicho, zona) {
   section.classList.remove('hidden');
 }
 
-function copiarGuardada(id) {
-  const textarea = document.getElementById(`cuerpo-g-${id}`);
-  navigator.clipboard.writeText(textarea.value).then(() => {
-    const btn = document.querySelector(`[onclick="copiarGuardada(${id})"]`);
-    const orig = btn.textContent;
-    btn.textContent = '✅ Copiado';
-    setTimeout(() => { btn.textContent = orig; }, 2000);
-  });
+/* ─── HTML helpers ──────────────────────────────────────────── */
+function renderEmailPlaceholder(tipo, index, nota) {
+  return `
+    <div class="email-placeholder">
+      ${nota ? `<div class="nota-email" style="margin-bottom:14px">ℹ️ ${esc(nota)}</div>` : ''}
+      <button class="btn-primary" onclick="generarEmailCard('${tipo}', ${index})">✉️ Generar email</button>
+    </div>
+  `;
 }
 
-async function marcarEnviadaGuardada(id, e, nicho) {
-  const textarea = document.getElementById(`cuerpo-g-${id}`);
-  const payload = {
-    empresa: e.nombre,
-    nicho,
-    sitio_web: e.sitio_web || '',
-    email_empresa: e.email || '',
-    asunto: e.asunto || '',
-    cuerpo: textarea.value,
-    idea_referencia: e.idea_referencia || '',
-    estado: 'enviado',
-  };
+function renderEmailArea(tipo, index, e) {
+  const tid = `cuerpo-${tipo}-${index}`;
+  return `
+    <div class="idea-box">
+      <strong>💡 Idea de referencia</strong>
+      <p>${esc(e.idea_referencia)}</p>
+    </div>
+    <div class="email-section">
+      <label>Asunto</label>
+      <div class="asunto-box">${esc(e.asunto)}</div>
+      <label>Cuerpo del email</label>
+      <textarea class="cuerpo-textarea" id="${tid}">${esc(e.cuerpo)}</textarea>
+      ${e.nota_email ? `<div class="nota-email">ℹ️ ${esc(e.nota_email)}</div>` : ''}
+    </div>
+    <div class="card-actions">
+      <button class="btn-sm btn-copy" onclick="copiarEmailCard('${tid}', this)">📋 Copiar email</button>
+      <button class="btn-sm btn-audio" id="btn-audio-${tipo}-${index}" onclick="escuchar('${tid}', 'btn-audio-${tipo}-${index}', '${esc(e.asunto)}')">🔊 Escuchar</button>
+      <button class="btn-sm btn-send" onclick="marcarEnviadoCard('${tipo}', ${index}, this)">✅ Marcar como enviado</button>
+    </div>
+  `;
+}
+
+/* ─── Generar email on demand ───────────────────────────────── */
+async function generarEmailCard(tipo, index) {
+  const bodyEl = document.getElementById(`body-${tipo}-${index}`);
+  bodyEl.innerHTML = `<div class="status loading" style="margin:0"><span class="spinner"></span>Generando email…</div>`;
+
   try {
-    await fetch('/api/historial', {
+    const empresa = tipo === 'r'
+      ? _resultados[index]
+      : _guardadas.find(e => e.id === index);
+
+    const refs = await fetch('/api/emails-referencia').then(r => r.json());
+    const res  = await fetch('/api/generar-email', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({
+        empresa,
+        nicho: _nicho,
+        zona: _zona,
+        guardadaId: empresa.guardadaId ?? empresa.id,
+        emailsReferencia: refs,
+      }),
     });
-    const btn = document.querySelector(`[onclick*="marcarEnviadaGuardada(${id},"]`);
-    btn.textContent = '✅ Guardada en historial';
-    btn.disabled = true;
-  } catch (err) {
-    alert('No se pudo guardar: ' + err.message);
-  }
-}
 
-async function eliminarGuardada(id) {
-  if (!confirm('¿Quitar esta empresa de las guardadas?')) return;
-  await fetch(`/api/empresas-guardadas/${id}`, { method: 'DELETE' });
-  const card = document.getElementById(`guardada-card-${id}`);
-  if (card) card.remove();
-  const remaining = document.querySelectorAll('.empresa-card.guardada').length;
-  if (!remaining) {
-    document.getElementById('guardadas-section').classList.add('hidden');
-  } else {
-    document.getElementById('guardadas-count').textContent =
-      `${remaining} empresa${remaining !== 1 ? 's' : ''}`;
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Error desconocido');
+
+    Object.assign(empresa, data);
+    bodyEl.innerHTML = renderEmailArea(tipo, index, empresa);
+  } catch (err) {
+    bodyEl.innerHTML = `
+      <div class="status error" style="margin:0">
+        ❌ ${esc(err.message)}
+        <button class="btn-sm btn-danger" style="margin-left:10px" onclick="generarEmailCard('${tipo}', ${index})">Reintentar</button>
+      </div>`;
   }
 }
 
 /* ─── Copiar email ──────────────────────────────────────────── */
-function copiarEmail(i) {
-  const textarea = document.getElementById(`cuerpo-${i}`);
+function copiarEmailCard(textareaId, btn) {
+  const textarea = document.getElementById(textareaId);
   navigator.clipboard.writeText(textarea.value).then(() => {
-    const btn = document.querySelector(`[onclick="copiarEmail(${i})"]`);
     const orig = btn.textContent;
     btn.textContent = '✅ Copiado';
     setTimeout(() => { btn.textContent = orig; }, 2000);
@@ -227,10 +226,10 @@ function copiarEmail(i) {
 /* ─── TTS ───────────────────────────────────────────────────── */
 let currentAudio = null;
 
-async function escuchar(i, asunto) {
-  const textarea = document.getElementById(`cuerpo-${i}`);
-  const btn = document.getElementById(`btn-audio-${i}`);
-  const texto = `Asunto: ${asunto}\n\n${textarea.value}`;
+async function escuchar(textareaId, btnId, asunto) {
+  const textarea = document.getElementById(textareaId);
+  const btn      = document.getElementById(btnId);
+  const texto    = `Asunto: ${asunto}\n\n${textarea.value}`;
 
   if (currentAudio) { currentAudio.pause(); currentAudio = null; }
 
@@ -246,14 +245,11 @@ async function escuchar(i, asunto) {
     if (!res.ok) throw new Error('Error al generar el audio');
 
     const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
+    const url  = URL.createObjectURL(blob);
     currentAudio = new Audio(url);
     currentAudio.play();
     btn.textContent = '🔊 Reproduciendo…';
-    currentAudio.onended = () => {
-      btn.textContent = '🔊 Escuchar';
-      btn.disabled = false;
-    };
+    currentAudio.onended = () => { btn.textContent = '🔊 Escuchar'; btn.disabled = false; };
   } catch (err) {
     alert(err.message);
     btn.textContent = '🔊 Escuchar';
@@ -262,15 +258,19 @@ async function escuchar(i, asunto) {
 }
 
 /* ─── Marcar como enviado ───────────────────────────────────── */
-async function marcarEnviado(i, empresa, nicho) {
-  const textarea = document.getElementById(`cuerpo-${i}`);
+async function marcarEnviadoCard(tipo, index, btn) {
+  const empresa = tipo === 'r'
+    ? _resultados[index]
+    : _guardadas.find(e => e.id === index);
+  const textarea = document.getElementById(`cuerpo-${tipo}-${index}`);
+
   const payload = {
     empresa: empresa.nombre,
-    nicho,
-    sitio_web: empresa.sitio_web || '',
-    email_empresa: empresa.email || '',
-    asunto: empresa.asunto,
-    cuerpo: textarea.value,
+    nicho:   _nicho,
+    sitio_web:    empresa.sitio_web    || '',
+    email_empresa: empresa.email       || '',
+    asunto:       empresa.asunto       || '',
+    cuerpo:       textarea.value,
     idea_referencia: empresa.idea_referencia || '',
     estado: 'enviado',
   };
@@ -281,11 +281,24 @@ async function marcarEnviado(i, empresa, nicho) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
-    const btn = document.querySelector(`[onclick*="marcarEnviado(${i},"]`);
     btn.textContent = '✅ Guardado en historial';
     btn.disabled = true;
   } catch (err) {
     alert('No se pudo guardar: ' + err.message);
+  }
+}
+
+/* ─── Eliminar guardada ─────────────────────────────────────── */
+async function eliminarGuardada(id) {
+  if (!confirm('¿Quitar esta empresa de las guardadas?')) return;
+  await fetch(`/api/empresas-guardadas/${id}`, { method: 'DELETE' });
+  document.getElementById(`guardada-card-${id}`)?.remove();
+  const remaining = document.querySelectorAll('.empresa-card.guardada').length;
+  if (!remaining) {
+    document.getElementById('guardadas-section').classList.add('hidden');
+  } else {
+    document.getElementById('guardadas-count').textContent =
+      `${remaining} empresa${remaining !== 1 ? 's' : ''}`;
   }
 }
 
@@ -300,7 +313,7 @@ async function loadHistorial() {
 
 function renderStats(data) {
   const statsEl = document.getElementById('historial-stats');
-  const total = data.length;
+  const total  = data.length;
   const nichos = [...new Set(data.map(r => r.nicho).filter(Boolean))].length;
   statsEl.innerHTML = `
     <span class="stat-chip">📊 ${total} contacto${total !== 1 ? 's' : ''}</span>
@@ -327,13 +340,13 @@ function renderHistorial(data) {
       <td>${formatFecha(r.fecha)}</td>
       <td>
         <select class="badge-estado badge-${r.estado || 'enviado'}" onchange="cambiarEstado(${r.id}, this.value, this)">
-          <option value="enviado"   ${r.estado === 'enviado'    ? 'selected' : ''}>Enviado</option>
-          <option value="pendiente" ${r.estado === 'pendiente'  ? 'selected' : ''}>Pendiente</option>
-          <option value="sin-resp"  ${r.estado === 'sin-resp'   ? 'selected' : ''}>Sin respuesta</option>
+          <option value="enviado"   ${r.estado === 'enviado'   ? 'selected' : ''}>Enviado</option>
+          <option value="pendiente" ${r.estado === 'pendiente' ? 'selected' : ''}>Pendiente</option>
+          <option value="sin-resp"  ${r.estado === 'sin-resp'  ? 'selected' : ''}>Sin respuesta</option>
         </select>
       </td>
       <td style="display:flex;gap:6px;flex-wrap:wrap">
-        <button class="btn-sm btn-view" onclick="verDetalle(${r.id})">👁️ Ver</button>
+        <button class="btn-sm btn-view"   onclick="verDetalle(${r.id})">👁️ Ver</button>
         <button class="btn-sm btn-danger" onclick="eliminarHistorial(${r.id})">🗑️</button>
       </td>
     </tr>
@@ -342,11 +355,10 @@ function renderHistorial(data) {
 
 document.getElementById('historial-filtro').addEventListener('input', function () {
   const q = this.value.toLowerCase();
-  const filtrado = historialData.filter(r =>
+  renderHistorial(historialData.filter(r =>
     (r.empresa || '').toLowerCase().includes(q) ||
-    (r.nicho || '').toLowerCase().includes(q)
-  );
-  renderHistorial(filtrado);
+    (r.nicho   || '').toLowerCase().includes(q)
+  ));
 });
 
 async function cambiarEstado(id, estado, select) {
@@ -368,8 +380,8 @@ function verDetalle(id) {
   const r = historialData.find(x => x.id === id);
   if (!r) return;
   document.getElementById('modal-empresa').textContent = r.empresa;
-  document.getElementById('modal-asunto').textContent = r.asunto || '—';
-  document.getElementById('modal-cuerpo').textContent = r.cuerpo || '—';
+  document.getElementById('modal-asunto').textContent  = r.asunto || '—';
+  document.getElementById('modal-cuerpo').textContent  = r.cuerpo || '—';
   document.getElementById('modal').classList.remove('hidden');
 }
 
@@ -416,7 +428,7 @@ async function loadRefs() {
 }
 
 document.getElementById('btn-guardar-ref').addEventListener('click', async () => {
-  const titulo = document.getElementById('ref-titulo').value.trim();
+  const titulo    = document.getElementById('ref-titulo').value.trim();
   const contenido = document.getElementById('ref-contenido').value.trim();
   if (!contenido) return alert('El contenido del email es obligatorio.');
 
@@ -426,7 +438,7 @@ document.getElementById('btn-guardar-ref').addEventListener('click', async () =>
     body: JSON.stringify({ titulo, contenido }),
   });
 
-  document.getElementById('ref-titulo').value = '';
+  document.getElementById('ref-titulo').value    = '';
   document.getElementById('ref-contenido').value = '';
   loadRefs();
 });

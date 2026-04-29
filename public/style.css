@@ -497,6 +497,16 @@ tr:hover td { background: rgba(255,255,255,.02); }
   width: 14px;
 }
 
+/* ─── Email placeholder ──────────────────────────────────────── */
+.email-placeholder {
+  padding: 6px 0 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+.email-placeholder .btn-primary { font-size: .875rem; padding: 9px 20px; }
+
 /* ─── Guardadas section ──────────────────────────────────────── */
 .guardadas-header {
   display: flex;

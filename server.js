@@ -27,26 +27,48 @@ app.post('/api/buscar', async (req, res) => {
     const empresas = await buscarEmpresas(nichoNorm, zonaNorm, nombresYaBuscados);
     if (!empresas.length) return res.status(404).json({ error: 'No se encontraron empresas. Intentá con otro nicho.' });
 
-    const resultados = await Promise.all(
-      empresas.map(e => generarEmail(e, nichoNorm, emailsReferencia))
-    );
-
-    resultados.forEach(r => db.addEmpresaGuardada({
-      nicho: nichoNorm,
-      zona: zonaNorm,
-      nombre: r.nombre,
-      sitio_web: r.sitio_web || '',
-      email: r.email || '',
-      tiene_rse: r.tiene_rse ? 1 : 0,
-      nota_email: r.nota_email || '',
-      idea_referencia: r.idea_referencia || '',
-      asunto: r.asunto || '',
-      cuerpo: r.cuerpo || '',
+    const resultados = empresas.map(e => ({
+      nombre:    e.nombre,
+      sitio_web: e.sitio_web || '',
+      email:     e.email     || '',
+      tiene_rse: e.tiene_rse || false,
+      nota_email: e.nota_email || '',
+      guardadaId: db.addEmpresaGuardada({
+        nicho: nichoNorm, zona: zonaNorm,
+        nombre: e.nombre, sitio_web: e.sitio_web || '',
+        email: e.email || '', tiene_rse: e.tiene_rse ? 1 : 0,
+        nota_email: e.nota_email || '',
+        idea_referencia: '', asunto: '', cuerpo: '',
+      }),
     }));
 
     res.json({ resultados, guardadasPrevias, zona: zonaNorm });
   } catch (err) {
     console.error('[/api/buscar]', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── GENERAR EMAIL ────────────────────────────────────────────────────────────
+
+app.post('/api/generar-email', async (req, res) => {
+  try {
+    const { empresa, nicho, guardadaId, emailsReferencia = [] } = req.body;
+    if (!empresa || !nicho) return res.status(400).json({ error: 'Datos insuficientes.' });
+
+    const emailData = await generarEmail(empresa, nicho.trim(), emailsReferencia);
+
+    if (guardadaId) {
+      db.updateEmpresaGuardadaEmail(guardadaId, {
+        idea_referencia: emailData.idea_referencia,
+        asunto: emailData.asunto,
+        cuerpo: emailData.cuerpo,
+      });
+    }
+
+    res.json(emailData);
+  } catch (err) {
+    console.error('[/api/generar-email]', err.message);
     res.status(500).json({ error: err.message });
   }
 });

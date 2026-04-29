@@ -108,6 +108,10 @@ module.exports = {
     `).run(data).lastInsertRowid;
   },
 
+  updateEmpresaGuardadaEmail: (id, data) =>
+    db.prepare('UPDATE empresas_guardadas SET idea_referencia = @idea_referencia, asunto = @asunto, cuerpo = @cuerpo WHERE id = @id')
+      .run({ ...data, id }),
+
   deleteEmpresaGuardada: (id) =>
     db.prepare('DELETE FROM empresas_guardadas WHERE id = ?').run(id),
 };
