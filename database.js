@@ -32,6 +32,7 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS empresas_guardadas (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     nicho           TEXT NOT NULL,
+    zona            TEXT NOT NULL DEFAULT '',
     nombre          TEXT NOT NULL,
     sitio_web       TEXT,
     email           TEXT,
@@ -43,6 +44,9 @@ db.exec(`
     fecha           TEXT DEFAULT (datetime('now', 'localtime'))
   );
 `);
+
+// Migración: agregar columna zona si no existe (para DBs previas)
+try { db.exec(`ALTER TABLE empresas_guardadas ADD COLUMN zona TEXT NOT NULL DEFAULT ''`); } catch (_) {}
 
 module.exports = {
   getHistorial: () =>
@@ -81,24 +85,26 @@ module.exports = {
   deleteEmailReferencia: (id) =>
     db.prepare('DELETE FROM emails_referencia WHERE id = ?').run(id),
 
-  getEmpresasGuardadas: (nicho) =>
-    nicho
-      ? db.prepare('SELECT * FROM empresas_guardadas WHERE lower(nicho) = lower(?) ORDER BY fecha DESC').all(nicho)
-      : db.prepare('SELECT * FROM empresas_guardadas ORDER BY fecha DESC').all(),
+  getEmpresasGuardadas: (nicho, zona) => {
+    if (nicho && zona) return db.prepare('SELECT * FROM empresas_guardadas WHERE lower(nicho) = lower(?) AND lower(zona) = lower(?) ORDER BY fecha DESC').all(nicho, zona);
+    if (nicho)         return db.prepare('SELECT * FROM empresas_guardadas WHERE lower(nicho) = lower(?) ORDER BY fecha DESC').all(nicho);
+    return db.prepare('SELECT * FROM empresas_guardadas ORDER BY fecha DESC').all();
+  },
 
-  getNombresGuardados: (nicho) =>
-    db.prepare('SELECT nombre FROM empresas_guardadas WHERE lower(nicho) = lower(?)').all(nicho).map(r => r.nombre),
+  getNombresGuardados: (nicho, zona) =>
+    db.prepare('SELECT nombre FROM empresas_guardadas WHERE lower(nicho) = lower(?) AND lower(zona) = lower(?)')
+      .all(nicho, zona).map(r => r.nombre),
 
   addEmpresaGuardada: (data) => {
     const exists = db.prepare(
-      'SELECT id FROM empresas_guardadas WHERE lower(nicho) = lower(?) AND lower(nombre) = lower(?)'
-    ).get(data.nicho, data.nombre);
+      'SELECT id FROM empresas_guardadas WHERE lower(nicho) = lower(?) AND lower(zona) = lower(?) AND lower(nombre) = lower(?)'
+    ).get(data.nicho, data.zona, data.nombre);
     if (exists) return exists.id;
     return db.prepare(`
       INSERT INTO empresas_guardadas
-        (nicho, nombre, sitio_web, email, tiene_rse, nota_email, idea_referencia, asunto, cuerpo)
+        (nicho, zona, nombre, sitio_web, email, tiene_rse, nota_email, idea_referencia, asunto, cuerpo)
       VALUES
-        (@nicho, @nombre, @sitio_web, @email, @tiene_rse, @nota_email, @idea_referencia, @asunto, @cuerpo)
+        (@nicho, @zona, @nombre, @sitio_web, @email, @tiene_rse, @nota_email, @idea_referencia, @asunto, @cuerpo)
     `).run(data).lastInsertRowid;
   },
 

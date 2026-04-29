@@ -16,14 +16,15 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 app.post('/api/buscar', async (req, res) => {
   try {
-    const { nicho, emailsReferencia = [] } = req.body;
+    const { nicho, zona = 'GBA / Conurbano Bonaerense', emailsReferencia = [] } = req.body;
     if (!nicho?.trim()) return res.status(400).json({ error: 'El nicho es requerido.' });
 
     const nichoNorm = nicho.trim();
-    const guardadasPrevias = db.getEmpresasGuardadas(nichoNorm);
+    const zonaNorm  = zona.trim() || 'GBA / Conurbano Bonaerense';
+    const guardadasPrevias = db.getEmpresasGuardadas(nichoNorm, zonaNorm);
     const nombresYaBuscados = guardadasPrevias.map(e => e.nombre);
 
-    const empresas = await buscarEmpresas(nichoNorm, nombresYaBuscados);
+    const empresas = await buscarEmpresas(nichoNorm, zonaNorm, nombresYaBuscados);
     if (!empresas.length) return res.status(404).json({ error: 'No se encontraron empresas. Intentá con otro nicho.' });
 
     const resultados = await Promise.all(
@@ -32,6 +33,7 @@ app.post('/api/buscar', async (req, res) => {
 
     resultados.forEach(r => db.addEmpresaGuardada({
       nicho: nichoNorm,
+      zona: zonaNorm,
       nombre: r.nombre,
       sitio_web: r.sitio_web || '',
       email: r.email || '',
@@ -42,7 +44,7 @@ app.post('/api/buscar', async (req, res) => {
       cuerpo: r.cuerpo || '',
     }));
 
-    res.json({ resultados, guardadasPrevias });
+    res.json({ resultados, guardadasPrevias, zona: zonaNorm });
   } catch (err) {
     console.error('[/api/buscar]', err.message);
     res.status(500).json({ error: err.message });
@@ -113,12 +115,12 @@ app.delete('/api/emails-referencia/:id', (req, res) => {
 
 // ─── FUNCIONES DE IA ──────────────────────────────────────────────────────────
 
-async function buscarEmpresas(nicho, nombresYaBuscados = []) {
+async function buscarEmpresas(nicho, zona, nombresYaBuscados = []) {
   const exclusionText = nombresYaBuscados.length
-    ? `\n\nIMPORTANTE: Las siguientes empresas ya fueron buscadas antes para este rubro, NO las incluyas. Encontrá empresas DISTINTAS:\n${nombresYaBuscados.slice(0, 20).join(', ')}`
+    ? `\n\nIMPORTANTE: Las siguientes empresas ya fueron buscadas antes para este rubro y zona. NO las incluyas, encontrá empresas DISTINTAS:\n${nombresYaBuscados.slice(0, 20).join(', ')}`
     : '';
 
-  const prompt = `Buscá en internet entre 6 y 8 empresas REALES del rubro "${nicho}" en el GBA/Conurbano Bonaerense, Argentina (o con presencia nacional en Argentina).${exclusionText}
+  const prompt = `Buscá en internet entre 6 y 8 empresas REALES del rubro "${nicho}" en ${zona}, Argentina.${exclusionText}
 
 Para cada empresa intentá encontrar:
 - Nombre real de la empresa

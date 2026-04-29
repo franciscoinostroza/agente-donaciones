@@ -43,6 +43,16 @@
           <input id="nicho-input" type="text" placeholder="Escribí el rubro..." />
           <button id="btn-buscar" class="btn-primary">Buscar</button>
         </div>
+        <div class="zona-label">📍 Zona de búsqueda</div>
+        <div class="zona-chips" id="zona-chips">
+          <button class="zona-chip active" data-zona="GBA / Conurbano Bonaerense">GBA / Conurbano</button>
+          <button class="zona-chip" data-zona="CABA">CABA</button>
+          <button class="zona-chip" data-zona="Córdoba">Córdoba</button>
+          <button class="zona-chip" data-zona="Rosario">Rosario</button>
+          <button class="zona-chip" data-zona="Mendoza">Mendoza</button>
+          <button class="zona-chip" data-zona="Mar del Plata">Mar del Plata</button>
+          <button class="zona-chip" data-zona="Argentina (nacional)">Todo el país</button>
+        </div>
         <div id="search-status" class="status hidden"></div>
       </div>
 
@@ -50,7 +60,7 @@
 
       <div id="guardadas-section" class="hidden">
         <div class="guardadas-header">
-          <h3 class="guardadas-titulo">📁 Ya buscadas en "<span id="guardadas-nicho-label"></span>"</h3>
+          <h3 class="guardadas-titulo">📁 Ya buscadas: <span id="guardadas-nicho-label"></span></h3>
           <span id="guardadas-count" class="stat-chip"></span>
         </div>
         <div id="guardadas-grid" class="resultados-grid"></div>

@@ -10,6 +10,17 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
   });
 });
 
+/* ─── Zona chips ────────────────────────────────────────────── */
+let zonaSeleccionada = 'GBA / Conurbano Bonaerense';
+
+document.querySelectorAll('.zona-chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    document.querySelectorAll('.zona-chip').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+    zonaSeleccionada = chip.dataset.zona;
+  });
+});
+
 /* ─── Buscar ────────────────────────────────────────────────── */
 const nichInput  = document.getElementById('nicho-input');
 const btnBuscar  = document.getElementById('btn-buscar');
@@ -32,7 +43,7 @@ async function buscar() {
     const res = await fetch('/api/buscar', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ nicho, emailsReferencia: refs }),
+      body: JSON.stringify({ nicho, zona: zonaSeleccionada, emailsReferencia: refs }),
     });
 
     const data = await res.json();
@@ -40,7 +51,7 @@ async function buscar() {
 
     hideStatus();
     renderResultados(data.resultados, nicho);
-    renderGuardadas(data.guardadasPrevias || [], nicho);
+    renderGuardadas(data.guardadasPrevias || [], nicho, data.zona || zonaSeleccionada);
   } catch (err) {
     showStatus('error', `❌ ${err.message}`);
   } finally {
@@ -66,8 +77,8 @@ function renderResultados(empresas, nicho) {
         <div>
           <div class="empresa-nombre">${esc(e.nombre)}</div>
           <div class="empresa-meta">
-            ${e.sitio_web ? `<a href="${esc(e.sitio_web)}" target="_blank" rel="noopener">🌐 ${esc(e.sitio_web)}</a>` : ''}
-            ${e.email ? ` &nbsp;|&nbsp; 📧 ${esc(e.email)}` : ''}
+            ${e.sitio_web ? `<a class="empresa-web-btn" href="${esc(e.sitio_web)}" target="_blank" rel="noopener">🌐 Sitio web</a>` : ''}
+            ${e.email ? `<span class="empresa-email-tag">📧 ${esc(e.email)}</span>` : ''}
           </div>
         </div>
         ${e.tiene_rse ? '<span class="badge-rse">✅ Tiene RSE</span>' : ''}
@@ -101,13 +112,13 @@ function renderResultados(empresas, nicho) {
 }
 
 /* ─── Guardadas ─────────────────────────────────────────────── */
-function renderGuardadas(empresas, nicho) {
+function renderGuardadas(empresas, nicho, zona) {
   const section = document.getElementById('guardadas-section');
   const grid    = document.getElementById('guardadas-grid');
 
   if (!empresas.length) { section.classList.add('hidden'); return; }
 
-  document.getElementById('guardadas-nicho-label').textContent = nicho;
+  document.getElementById('guardadas-nicho-label').textContent = zona ? `${nicho} · ${zona}` : nicho;
   document.getElementById('guardadas-count').textContent =
     `${empresas.length} empresa${empresas.length !== 1 ? 's' : ''}`;
 
@@ -121,8 +132,8 @@ function renderGuardadas(empresas, nicho) {
         <div>
           <div class="empresa-nombre">${esc(e.nombre)}</div>
           <div class="empresa-meta">
-            ${e.sitio_web ? `<a href="${esc(e.sitio_web)}" target="_blank" rel="noopener">🌐 ${esc(e.sitio_web)}</a>` : ''}
-            ${e.email ? ` &nbsp;|&nbsp; 📧 ${esc(e.email)}` : ''}
+            ${e.sitio_web ? `<a class="empresa-web-btn" href="${esc(e.sitio_web)}" target="_blank" rel="noopener">🌐 Sitio web</a>` : ''}
+            ${e.email ? `<span class="empresa-email-tag">📧 ${esc(e.email)}</span>` : ''}
           </div>
         </div>
         ${e.tiene_rse ? '<span class="badge-rse">✅ Tiene RSE</span>' : ''}
