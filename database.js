@@ -1,123 +1,176 @@
-const Database = require('better-sqlite3');
-const path = require('path');
-const fs = require('fs');
+const { createClient } = require('@libsql/client');
 
-const dataDir = path.join(__dirname, 'data');
-if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir);
+const client = createClient({
+  url: process.env.TURSO_DATABASE_URL || 'file:./data/iea.db',
+  authToken: process.env.TURSO_AUTH_TOKEN,
+});
 
-const db = new Database(path.join(dataDir, 'iea.db'));
-
-db.exec(`
-  CREATE TABLE IF NOT EXISTS historial (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    empresa     TEXT NOT NULL,
-    nicho       TEXT,
-    sitio_web   TEXT,
-    email_empresa TEXT,
-    asunto      TEXT,
-    cuerpo      TEXT,
-    idea_referencia TEXT,
-    fecha       TEXT DEFAULT (datetime('now', 'localtime')),
-    estado      TEXT DEFAULT 'enviado',
-    notas       TEXT
-  );
-
-  CREATE TABLE IF NOT EXISTS emails_referencia (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    titulo      TEXT,
-    contenido   TEXT NOT NULL,
-    fecha       TEXT DEFAULT (datetime('now', 'localtime'))
-  );
-
-  CREATE TABLE IF NOT EXISTS empresas_guardadas (
-    id              INTEGER PRIMARY KEY AUTOINCREMENT,
-    nicho           TEXT NOT NULL,
-    zona            TEXT NOT NULL DEFAULT '',
-    nombre          TEXT NOT NULL,
-    sitio_web       TEXT,
-    email           TEXT,
-    tiene_rse       INTEGER DEFAULT 0,
-    nota_email      TEXT,
-    idea_referencia TEXT,
-    asunto          TEXT,
-    cuerpo          TEXT,
-    fecha           TEXT DEFAULT (datetime('now', 'localtime'))
-  );
-`);
-
-// Migraciones para DBs previas
-try { db.exec(`ALTER TABLE empresas_guardadas ADD COLUMN zona TEXT NOT NULL DEFAULT ''`); } catch (_) {}
-try { db.exec(`ALTER TABLE empresas_guardadas ADD COLUMN direccion TEXT`); } catch (_) {}
-try { db.exec(`ALTER TABLE empresas_guardadas ADD COLUMN telefono TEXT`); } catch (_) {}
-try { db.exec(`ALTER TABLE empresas_guardadas ADD COLUMN contacto_nombre TEXT`); } catch (_) {}
-try { db.exec(`ALTER TABLE empresas_guardadas ADD COLUMN fuente TEXT`); } catch (_) {}
+const init = client.batch([
+  {
+    sql: `CREATE TABLE IF NOT EXISTS historial (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      empresa     TEXT NOT NULL,
+      nicho       TEXT,
+      sitio_web   TEXT,
+      email_empresa TEXT,
+      asunto      TEXT,
+      cuerpo      TEXT,
+      idea_referencia TEXT,
+      fecha       TEXT DEFAULT (datetime('now', 'localtime')),
+      estado      TEXT DEFAULT 'enviado',
+      notas       TEXT
+    )`,
+    args: [],
+  },
+  {
+    sql: `CREATE TABLE IF NOT EXISTS emails_referencia (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      titulo      TEXT,
+      contenido   TEXT NOT NULL,
+      fecha       TEXT DEFAULT (datetime('now', 'localtime'))
+    )`,
+    args: [],
+  },
+  {
+    sql: `CREATE TABLE IF NOT EXISTS empresas_guardadas (
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      nicho           TEXT NOT NULL,
+      zona            TEXT NOT NULL DEFAULT '',
+      nombre          TEXT NOT NULL,
+      sitio_web       TEXT,
+      email           TEXT,
+      tiene_rse       INTEGER DEFAULT 0,
+      nota_email      TEXT,
+      idea_referencia TEXT,
+      asunto          TEXT,
+      cuerpo          TEXT,
+      fecha           TEXT DEFAULT (datetime('now', 'localtime')),
+      direccion       TEXT,
+      telefono        TEXT,
+      contacto_nombre TEXT,
+      fuente          TEXT
+    )`,
+    args: [],
+  },
+], 'write').then(async () => {
+  // Migraciones para DBs previas (columnas pueden ya existir)
+  const migrations = [
+    `ALTER TABLE empresas_guardadas ADD COLUMN zona TEXT NOT NULL DEFAULT ''`,
+    `ALTER TABLE empresas_guardadas ADD COLUMN direccion TEXT`,
+    `ALTER TABLE empresas_guardadas ADD COLUMN telefono TEXT`,
+    `ALTER TABLE empresas_guardadas ADD COLUMN contacto_nombre TEXT`,
+    `ALTER TABLE empresas_guardadas ADD COLUMN fuente TEXT`,
+  ];
+  for (const sql of migrations) {
+    try { await client.execute(sql); } catch (_) {}
+  }
+});
 
 module.exports = {
-  getHistorial: () =>
-    db.prepare('SELECT * FROM historial ORDER BY fecha DESC').all(),
+  init,
 
-  addHistorial: (data) => {
-    const stmt = db.prepare(`
-      INSERT INTO historial
-        (empresa, nicho, sitio_web, email_empresa, asunto, cuerpo, idea_referencia, estado)
-      VALUES
-        (@empresa, @nicho, @sitio_web, @email_empresa, @asunto, @cuerpo, @idea_referencia, @estado)
-    `);
-    return stmt.run(data).lastInsertRowid;
+  getHistorial: async () => {
+    const result = await client.execute('SELECT * FROM historial ORDER BY fecha DESC');
+    return result.rows.map(r => ({ ...r }));
   },
 
-  updateHistorial: (id, data) => {
+  addHistorial: async (data) => {
+    const result = await client.execute({
+      sql: `INSERT INTO historial
+              (empresa, nicho, sitio_web, email_empresa, asunto, cuerpo, idea_referencia, estado)
+            VALUES
+              (?, ?, ?, ?, ?, ?, ?, ?)`,
+      args: [data.empresa, data.nicho, data.sitio_web, data.email_empresa,
+             data.asunto, data.cuerpo, data.idea_referencia, data.estado],
+    });
+    return Number(result.lastInsertRowid);
+  },
+
+  updateHistorial: async (id, data) => {
     const allowed = ['estado', 'notas'];
-    const fields = Object.keys(data)
-      .filter(k => allowed.includes(k))
-      .map(k => `${k} = @${k}`)
-      .join(', ');
-    if (!fields) return;
-    db.prepare(`UPDATE historial SET ${fields} WHERE id = @id`).run({ ...data, id });
+    const keys = Object.keys(data).filter(k => allowed.includes(k));
+    if (!keys.length) return;
+    const fields = keys.map(k => `${k} = ?`).join(', ');
+    const args   = [...keys.map(k => data[k]), id];
+    await client.execute({ sql: `UPDATE historial SET ${fields} WHERE id = ?`, args });
   },
 
-  deleteHistorial: (id) =>
-    db.prepare('DELETE FROM historial WHERE id = ?').run(id),
-
-  getEmailsReferencia: () =>
-    db.prepare('SELECT * FROM emails_referencia ORDER BY fecha DESC').all(),
-
-  addEmailReferencia: (data) =>
-    db.prepare('INSERT INTO emails_referencia (titulo, contenido) VALUES (@titulo, @contenido)')
-      .run(data).lastInsertRowid,
-
-  deleteEmailReferencia: (id) =>
-    db.prepare('DELETE FROM emails_referencia WHERE id = ?').run(id),
-
-  getEmpresasGuardadas: (nicho, zona) => {
-    if (nicho && zona) return db.prepare('SELECT * FROM empresas_guardadas WHERE lower(nicho) = lower(?) AND lower(zona) = lower(?) ORDER BY fecha DESC').all(nicho, zona);
-    if (nicho)         return db.prepare('SELECT * FROM empresas_guardadas WHERE lower(nicho) = lower(?) ORDER BY fecha DESC').all(nicho);
-    return db.prepare('SELECT * FROM empresas_guardadas ORDER BY fecha DESC').all();
+  deleteHistorial: async (id) => {
+    await client.execute({ sql: 'DELETE FROM historial WHERE id = ?', args: [id] });
   },
 
-  getNombresGuardados: (nicho, zona) =>
-    db.prepare('SELECT nombre FROM empresas_guardadas WHERE lower(nicho) = lower(?) AND lower(zona) = lower(?)')
-      .all(nicho, zona).map(r => r.nombre),
-
-  addEmpresaGuardada: (data) => {
-    const exists = db.prepare(
-      'SELECT id FROM empresas_guardadas WHERE lower(nicho) = lower(?) AND lower(zona) = lower(?) AND lower(nombre) = lower(?)'
-    ).get(data.nicho, data.zona, data.nombre);
-    if (exists) return exists.id;
-    return db.prepare(`
-      INSERT INTO empresas_guardadas
-        (nicho, zona, nombre, sitio_web, email, tiene_rse, nota_email, idea_referencia, asunto, cuerpo,
-         direccion, telefono, contacto_nombre, fuente)
-      VALUES
-        (@nicho, @zona, @nombre, @sitio_web, @email, @tiene_rse, @nota_email, @idea_referencia, @asunto, @cuerpo,
-         @direccion, @telefono, @contacto_nombre, @fuente)
-    `).run(data).lastInsertRowid;
+  getEmailsReferencia: async () => {
+    const result = await client.execute('SELECT * FROM emails_referencia ORDER BY fecha DESC');
+    return result.rows.map(r => ({ ...r }));
   },
 
-  updateEmpresaGuardadaEmail: (id, data) =>
-    db.prepare('UPDATE empresas_guardadas SET idea_referencia = @idea_referencia, asunto = @asunto, cuerpo = @cuerpo WHERE id = @id')
-      .run({ ...data, id }),
+  addEmailReferencia: async (data) => {
+    const result = await client.execute({
+      sql: 'INSERT INTO emails_referencia (titulo, contenido) VALUES (?, ?)',
+      args: [data.titulo, data.contenido],
+    });
+    return Number(result.lastInsertRowid);
+  },
 
-  deleteEmpresaGuardada: (id) =>
-    db.prepare('DELETE FROM empresas_guardadas WHERE id = ?').run(id),
+  deleteEmailReferencia: async (id) => {
+    await client.execute({ sql: 'DELETE FROM emails_referencia WHERE id = ?', args: [id] });
+  },
+
+  getEmpresasGuardadas: async (nicho, zona) => {
+    let result;
+    if (nicho && zona) {
+      result = await client.execute({
+        sql: 'SELECT * FROM empresas_guardadas WHERE lower(nicho) = lower(?) AND lower(zona) = lower(?) ORDER BY fecha DESC',
+        args: [nicho, zona],
+      });
+    } else if (nicho) {
+      result = await client.execute({
+        sql: 'SELECT * FROM empresas_guardadas WHERE lower(nicho) = lower(?) ORDER BY fecha DESC',
+        args: [nicho],
+      });
+    } else {
+      result = await client.execute('SELECT * FROM empresas_guardadas ORDER BY fecha DESC');
+    }
+    return result.rows.map(r => ({ ...r }));
+  },
+
+  getNombresGuardados: async (nicho, zona) => {
+    const result = await client.execute({
+      sql: 'SELECT nombre FROM empresas_guardadas WHERE lower(nicho) = lower(?) AND lower(zona) = lower(?)',
+      args: [nicho, zona],
+    });
+    return result.rows.map(r => r.nombre);
+  },
+
+  addEmpresaGuardada: async (data) => {
+    const existing = await client.execute({
+      sql: 'SELECT id FROM empresas_guardadas WHERE lower(nicho) = lower(?) AND lower(zona) = lower(?) AND lower(nombre) = lower(?)',
+      args: [data.nicho, data.zona, data.nombre],
+    });
+    if (existing.rows.length) return Number(existing.rows[0].id);
+    const result = await client.execute({
+      sql: `INSERT INTO empresas_guardadas
+              (nicho, zona, nombre, sitio_web, email, tiene_rse, nota_email, idea_referencia, asunto, cuerpo,
+               direccion, telefono, contacto_nombre, fuente)
+            VALUES
+              (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      args: [
+        data.nicho, data.zona, data.nombre, data.sitio_web, data.email,
+        data.tiene_rse, data.nota_email, data.idea_referencia, data.asunto, data.cuerpo,
+        data.direccion, data.telefono, data.contacto_nombre, data.fuente,
+      ],
+    });
+    return Number(result.lastInsertRowid);
+  },
+
+  updateEmpresaGuardadaEmail: async (id, data) => {
+    await client.execute({
+      sql: 'UPDATE empresas_guardadas SET idea_referencia = ?, asunto = ?, cuerpo = ? WHERE id = ?',
+      args: [data.idea_referencia, data.asunto, data.cuerpo, id],
+    });
+  },
+
+  deleteEmpresaGuardada: async (id) => {
+    await client.execute({ sql: 'DELETE FROM empresas_guardadas WHERE id = ?', args: [id] });
+  },
 };

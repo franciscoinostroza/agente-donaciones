@@ -21,7 +21,7 @@ app.post('/api/buscar', async (req, res) => {
 
     const nichoNorm = nicho.trim();
     const zonaNorm  = zona.trim() || 'GBA / Conurbano Bonaerense';
-    const guardadasPrevias = db.getEmpresasGuardadas(nichoNorm, zonaNorm);
+    const guardadasPrevias = await db.getEmpresasGuardadas(nichoNorm, zonaNorm);
     const nombresYaBuscados = guardadasPrevias.map(e => e.nombre);
 
     const empresas = await buscarEmpresas(nichoNorm, zonaNorm, nombresYaBuscados);
@@ -32,16 +32,9 @@ app.post('/api/buscar', async (req, res) => {
 
     if (!Array.isArray(empresas) || !empresas.length) return res.status(404).json({ error: 'No se encontraron empresas. Intentá con otro nicho.' });
 
-    const resultados = empresas.map(e => ({
-      nombre:          e.nombre,
-      sitio_web:       e.sitio_web       || null,
-      email:           e.email           || null,
-      tiene_rse:       e.tiene_rse       ?? null,
-      direccion:       e.direccion       || null,
-      telefono:        e.telefono        || null,
-      contacto_nombre: e.contacto_nombre || null,
-      fuente:          e.fuente          || null,
-      guardadaId: db.addEmpresaGuardada({
+    const resultados = [];
+    for (const e of empresas) {
+      const guardadaId = await db.addEmpresaGuardada({
         nicho: nichoNorm, zona: zonaNorm,
         nombre: e.nombre,
         sitio_web:       e.sitio_web       || null,
@@ -53,8 +46,19 @@ app.post('/api/buscar', async (req, res) => {
         telefono:        e.telefono        || null,
         contacto_nombre: e.contacto_nombre || null,
         fuente:          e.fuente          || null,
-      }),
-    }));
+      });
+      resultados.push({
+        nombre:          e.nombre,
+        sitio_web:       e.sitio_web       || null,
+        email:           e.email           || null,
+        tiene_rse:       e.tiene_rse       ?? null,
+        direccion:       e.direccion       || null,
+        telefono:        e.telefono        || null,
+        contacto_nombre: e.contacto_nombre || null,
+        fuente:          e.fuente          || null,
+        guardadaId,
+      });
+    }
 
     res.json({ resultados, guardadasPrevias, zona: zonaNorm });
   } catch (err) {
@@ -73,7 +77,7 @@ app.post('/api/generar-email', async (req, res) => {
     const emailData = await generarEmail(empresa, nicho.trim(), emailsReferencia);
 
     if (guardadaId) {
-      db.updateEmpresaGuardadaEmail(guardadaId, {
+      await db.updateEmpresaGuardadaEmail(guardadaId, {
         idea_referencia: emailData.idea_referencia,
         asunto: emailData.asunto,
         cuerpo: emailData.cuerpo,
@@ -89,13 +93,23 @@ app.post('/api/generar-email', async (req, res) => {
 
 // ─── EMPRESAS GUARDADAS ───────────────────────────────────────────────────────
 
-app.get('/api/empresas-guardadas', (req, res) => {
-  res.json(db.getEmpresasGuardadas(req.query.nicho || null));
+app.get('/api/empresas-guardadas', async (req, res) => {
+  try {
+    res.json(await db.getEmpresasGuardadas(req.query.nicho || null));
+  } catch (err) {
+    console.error('[GET /api/empresas-guardadas]', err.message);
+    res.status(500).json({ error: err.message });
+  }
 });
 
-app.delete('/api/empresas-guardadas/:id', (req, res) => {
-  db.deleteEmpresaGuardada(req.params.id);
-  res.json({ ok: true });
+app.delete('/api/empresas-guardadas/:id', async (req, res) => {
+  try {
+    await db.deleteEmpresaGuardada(req.params.id);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[DELETE /api/empresas-guardadas/:id]', err.message);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ─── AUDIO TTS ────────────────────────────────────────────────────────────────
@@ -114,39 +128,74 @@ app.post('/api/audio', async (req, res) => {
 
 // ─── HISTORIAL ────────────────────────────────────────────────────────────────
 
-app.get('/api/historial', (_req, res) => {
-  res.json(db.getHistorial());
+app.get('/api/historial', async (_req, res) => {
+  try {
+    res.json(await db.getHistorial());
+  } catch (err) {
+    console.error('[GET /api/historial]', err.message);
+    res.status(500).json({ error: err.message });
+  }
 });
 
-app.post('/api/historial', (req, res) => {
-  const id = db.addHistorial({ estado: 'enviado', ...req.body });
-  res.json({ id });
+app.post('/api/historial', async (req, res) => {
+  try {
+    const id = await db.addHistorial({ estado: 'enviado', ...req.body });
+    res.json({ id });
+  } catch (err) {
+    console.error('[POST /api/historial]', err.message);
+    res.status(500).json({ error: err.message });
+  }
 });
 
-app.patch('/api/historial/:id', (req, res) => {
-  db.updateHistorial(req.params.id, req.body);
-  res.json({ ok: true });
+app.patch('/api/historial/:id', async (req, res) => {
+  try {
+    await db.updateHistorial(req.params.id, req.body);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[PATCH /api/historial/:id]', err.message);
+    res.status(500).json({ error: err.message });
+  }
 });
 
-app.delete('/api/historial/:id', (req, res) => {
-  db.deleteHistorial(req.params.id);
-  res.json({ ok: true });
+app.delete('/api/historial/:id', async (req, res) => {
+  try {
+    await db.deleteHistorial(req.params.id);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[DELETE /api/historial/:id]', err.message);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ─── EMAILS DE REFERENCIA ─────────────────────────────────────────────────────
 
-app.get('/api/emails-referencia', (_req, res) => {
-  res.json(db.getEmailsReferencia());
+app.get('/api/emails-referencia', async (_req, res) => {
+  try {
+    res.json(await db.getEmailsReferencia());
+  } catch (err) {
+    console.error('[GET /api/emails-referencia]', err.message);
+    res.status(500).json({ error: err.message });
+  }
 });
 
-app.post('/api/emails-referencia', (req, res) => {
-  const id = db.addEmailReferencia(req.body);
-  res.json({ id });
+app.post('/api/emails-referencia', async (req, res) => {
+  try {
+    const id = await db.addEmailReferencia(req.body);
+    res.json({ id });
+  } catch (err) {
+    console.error('[POST /api/emails-referencia]', err.message);
+    res.status(500).json({ error: err.message });
+  }
 });
 
-app.delete('/api/emails-referencia/:id', (req, res) => {
-  db.deleteEmailReferencia(req.params.id);
-  res.json({ ok: true });
+app.delete('/api/emails-referencia/:id', async (req, res) => {
+  try {
+    await db.deleteEmailReferencia(req.params.id);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[DELETE /api/emails-referencia/:id]', err.message);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ─── FUNCIONES DE IA ──────────────────────────────────────────────────────────
@@ -285,6 +334,11 @@ Devolvé ÚNICAMENTE un JSON válido, sin texto adicional ni bloques de código:
 // ─── SERVIDOR ─────────────────────────────────────────────────────────────────
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`✅ Servidor IEA corriendo en http://localhost:${PORT}`);
+db.init.then(() => {
+  app.listen(PORT, () => {
+    console.log(`Servidor IEA corriendo en http://localhost:${PORT}`);
+  });
+}).catch(err => {
+  console.error('Error al inicializar la base de datos:', err);
+  process.exit(1);
 });
