@@ -116,13 +116,13 @@ function renderResultados(empresas) {
           <div class="empresa-nombre">${esc(e.nombre)}</div>
           <div class="empresa-meta">
             ${e.sitio_web ? `<a class="empresa-web-btn" href="${esc(e.sitio_web)}" target="_blank" rel="noopener">🌐 Sitio web</a>` : ''}
-            ${e.email ? `<span class="empresa-email-tag">📧 ${esc(e.email)}</span>` : ''}
           </div>
         </div>
-        ${e.tiene_rse ? '<span class="badge-rse">✅ Tiene RSE</span>' : ''}
+        ${e.tiene_rse ? '<span class="badge-rse">✅ RSE</span>' : ''}
       </div>
+      ${renderEmpresaInfo(e)}
       <div class="empresa-body" id="body-r-${i}">
-        ${renderEmailPlaceholder('r', i, e.nota_email)}
+        ${renderEmailPlaceholder('r', i)}
       </div>
     `;
     resultados.appendChild(card);
@@ -151,18 +151,16 @@ function renderGuardadas(empresas) {
           <div class="empresa-nombre">${esc(e.nombre)}</div>
           <div class="empresa-meta">
             ${e.sitio_web ? `<a class="empresa-web-btn" href="${esc(e.sitio_web)}" target="_blank" rel="noopener">🌐 Sitio web</a>` : ''}
-            ${e.email ? `<span class="empresa-email-tag">📧 ${esc(e.email)}</span>` : ''}
           </div>
         </div>
         <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-          ${e.tiene_rse ? '<span class="badge-rse">✅ Tiene RSE</span>' : ''}
+          ${e.tiene_rse ? '<span class="badge-rse">✅ RSE</span>' : ''}
           <button class="btn-sm btn-danger" onclick="eliminarGuardada(${e.id})">🗑️</button>
         </div>
       </div>
+      ${renderEmpresaInfo(e)}
       <div class="empresa-body" id="body-g-${e.id}">
-        ${e.asunto
-          ? renderEmailArea('g', e.id, e)
-          : renderEmailPlaceholder('g', e.id, e.nota_email)}
+        ${e.asunto ? renderEmailArea('g', e.id, e) : renderEmailPlaceholder('g', e.id)}
       </div>
     `;
     grid.appendChild(card);
@@ -172,10 +170,45 @@ function renderGuardadas(empresas) {
 }
 
 /* ─── HTML helpers ──────────────────────────────────────────── */
-function renderEmailPlaceholder(tipo, index, nota) {
+function renderEmpresaInfo(e) {
+  const rows = [];
+  if (e.direccion) rows.push(`
+    <div class="info-row">
+      <span class="info-icon">📍</span>
+      <span class="info-text">${esc(e.direccion)}</span>
+      <a class="btn-icon" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(e.direccion)}" target="_blank" rel="noopener" title="Ver en Google Maps">🗺️</a>
+    </div>`);
+  if (e.telefono) rows.push(`
+    <div class="info-row">
+      <span class="info-icon">📞</span>
+      <span class="info-text">${esc(e.telefono)}</span>
+      <button class="btn-icon" data-copy="${esc(e.telefono)}" onclick="copiarDato(this)" title="Copiar">📋</button>
+      <a class="btn-icon" href="https://wa.me/${limpiarTelefono(e.telefono)}" target="_blank" rel="noopener" title="Abrir WhatsApp">💬</a>
+    </div>`);
+  if (e.email) rows.push(`
+    <div class="info-row">
+      <span class="info-icon">📧</span>
+      <span class="info-text">${esc(e.email)}</span>
+      <button class="btn-icon" data-copy="${esc(e.email)}" onclick="copiarDato(this)" title="Copiar">📋</button>
+      <a class="btn-icon" href="mailto:${esc(e.email)}" title="Redactar email">✉️</a>
+    </div>`);
+  if (e.contacto_nombre) rows.push(`
+    <div class="info-row">
+      <span class="info-icon">👤</span>
+      <span class="info-text">${esc(e.contacto_nombre)}</span>
+    </div>`);
+  if (e.fuente) rows.push(`
+    <div class="info-row">
+      <span class="info-icon">🔗</span>
+      <a class="info-link" href="${esc(e.fuente)}" target="_blank" rel="noopener">${esc(e.fuente)}</a>
+    </div>`);
+  if (!rows.length) return '';
+  return `<div class="empresa-info">${rows.join('')}</div>`;
+}
+
+function renderEmailPlaceholder(tipo, index) {
   return `
     <div class="email-placeholder">
-      ${nota ? `<div class="nota-email" style="margin-bottom:14px">ℹ️ ${esc(nota)}</div>` : ''}
       <button class="btn-primary" onclick="generarEmailCard('${tipo}', ${index})">✉️ Generar email</button>
     </div>
   `;
@@ -189,16 +222,20 @@ function renderEmailArea(tipo, index, e) {
       <p>${esc(e.idea_referencia)}</p>
     </div>
     <div class="email-section">
-      <label>Asunto</label>
+      <div class="asunto-row">
+        <label>Asunto</label>
+        <button class="btn-icon" data-copy="${esc(e.asunto)}" onclick="copiarDato(this)" title="Copiar asunto">📋</button>
+      </div>
       <div class="asunto-box">${esc(e.asunto)}</div>
       <label>Cuerpo del email</label>
       <textarea class="cuerpo-textarea" id="${tid}">${esc(e.cuerpo)}</textarea>
-      ${e.nota_email ? `<div class="nota-email">ℹ️ ${esc(e.nota_email)}</div>` : ''}
     </div>
     <div class="card-actions">
-      <button class="btn-sm btn-copy" onclick="copiarEmailCard('${tid}', this)">📋 Copiar email</button>
+      <button class="btn-sm btn-copy"      onclick="copiarEmailCard('${tid}', this)">📋 Copiar</button>
+      ${e.email    ? `<button class="btn-sm btn-gmail"    onclick="abrirMailto('${tipo}', ${index})">✉️ Gmail</button>`     : ''}
+      ${e.telefono ? `<button class="btn-sm btn-whatsapp" onclick="abrirWhatsApp('${tipo}', ${index})">💬 WhatsApp</button>` : ''}
       <button class="btn-sm btn-audio" id="btn-audio-${tipo}-${index}" onclick="escuchar('${tid}', 'btn-audio-${tipo}-${index}', '${esc(e.asunto)}')">🔊 Escuchar</button>
-      <button class="btn-sm btn-send" onclick="marcarEnviadoCard('${tipo}', ${index}, this)">✅ Marcar como enviado</button>
+      <button class="btn-sm btn-send"      onclick="marcarEnviadoCard('${tipo}', ${index}, this)">✅ Enviado</button>
     </div>
   `;
 }
@@ -209,11 +246,7 @@ async function generarEmailCard(tipo, index) {
   bodyEl.innerHTML = `<div class="status loading" style="margin:0"><span class="spinner"></span>Generando email…</div>`;
 
   try {
-    const empresa = tipo === 'r'
-      ? _resultados[index]
-      : tipo === 'g'
-      ? _guardadas.find(e => e.id === index)
-      : _todasGuardadas.find(e => e.id === index);
+    const empresa = getEmpresa(tipo, index);
 
     const nicho = tipo === 't' ? empresa.nicho : _nicho;
     const zona  = tipo === 't' ? empresa.zona  : _zona;
@@ -291,11 +324,7 @@ async function escuchar(textareaId, btnId, asunto) {
 
 /* ─── Marcar como enviado ───────────────────────────────────── */
 async function marcarEnviadoCard(tipo, index, btn) {
-  const empresa = tipo === 'r'
-    ? _resultados[index]
-    : tipo === 'g'
-    ? _guardadas.find(e => e.id === index)
-    : _todasGuardadas.find(e => e.id === index);
+  const empresa = getEmpresa(tipo, index);
   const textarea = document.getElementById(`cuerpo-${tipo}-${index}`);
 
   const payload = {
@@ -381,7 +410,6 @@ function renderGuardadasTab(empresas) {
           <div class="empresa-nombre">${esc(e.nombre)}</div>
           <div class="empresa-meta">
             ${e.sitio_web ? `<a class="empresa-web-btn" href="${esc(e.sitio_web)}" target="_blank" rel="noopener">🌐 Sitio web</a>` : ''}
-            ${e.email ? `<span class="empresa-email-tag">📧 ${esc(e.email)}</span>` : ''}
           </div>
           <div class="empresa-tags">
             <span class="tag-nicho">${esc(e.nicho)}</span>
@@ -389,14 +417,13 @@ function renderGuardadasTab(empresas) {
           </div>
         </div>
         <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-          ${e.tiene_rse ? '<span class="badge-rse">✅ Tiene RSE</span>' : ''}
+          ${e.tiene_rse ? '<span class="badge-rse">✅ RSE</span>' : ''}
           <button class="btn-sm btn-danger" onclick="eliminarGuardadaTab(${e.id})">🗑️</button>
         </div>
       </div>
+      ${renderEmpresaInfo(e)}
       <div class="empresa-body" id="body-t-${e.id}">
-        ${e.asunto
-          ? renderEmailArea('t', e.id, e)
-          : renderEmailPlaceholder('t', e.id, e.nota_email)}
+        ${e.asunto ? renderEmailArea('t', e.id, e) : renderEmailPlaceholder('t', e.id)}
       </div>
     `;
     grid.appendChild(card);
@@ -556,6 +583,44 @@ async function eliminarRef(id) {
   if (!confirm('¿Eliminar este email de referencia?')) return;
   await fetch(`/api/emails-referencia/${id}`, { method: 'DELETE' });
   loadRefs();
+}
+
+/* ─── Abrir Gmail / WhatsApp ────────────────────────────────── */
+function getEmpresa(tipo, index) {
+  if (tipo === 'r') return _resultados[index];
+  if (tipo === 'g') return _guardadas.find(e => e.id === index);
+  if (tipo === 't') return _todasGuardadas.find(e => e.id === index);
+  return null;
+}
+
+function limpiarTelefono(tel) {
+  if (!tel) return '';
+  let d = String(tel).replace(/\D/g, '');
+  if (d.startsWith('0')) d = '54' + d.slice(1);
+  if (!d.startsWith('54') && d.length <= 10) d = '54' + d;
+  return d;
+}
+
+function copiarDato(btn) {
+  navigator.clipboard.writeText(btn.dataset.copy || '').then(() => {
+    const orig = btn.textContent;
+    btn.textContent = '✅';
+    setTimeout(() => { btn.textContent = orig; }, 1500);
+  });
+}
+
+function abrirMailto(tipo, index) {
+  const e = getEmpresa(tipo, index);
+  if (!e?.email) return;
+  const body = document.getElementById(`cuerpo-${tipo}-${index}`)?.value || '';
+  window.open(`mailto:${e.email}?subject=${encodeURIComponent(e.asunto || '')}&body=${encodeURIComponent(body)}`);
+}
+
+function abrirWhatsApp(tipo, index) {
+  const e = getEmpresa(tipo, index);
+  if (!e?.telefono) return;
+  const body = document.getElementById(`cuerpo-${tipo}-${index}`)?.value || '';
+  window.open(`https://wa.me/${limpiarTelefono(e.telefono)}?text=${encodeURIComponent(body)}`);
 }
 
 /* ─── Utils ─────────────────────────────────────────────────── */

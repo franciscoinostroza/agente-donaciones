@@ -569,6 +569,77 @@ tr:hover td { background: rgba(255,255,255,.02); }
   color: var(--text);
 }
 
+/* ─── Empresa info rows ──────────────────────────────────────── */
+.empresa-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(255,255,255,.02);
+}
+.info-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: .82rem;
+  min-height: 28px;
+}
+.info-icon { flex-shrink: 0; width: 18px; text-align: center; font-size: .85rem; }
+.info-text {
+  flex: 1;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.info-link {
+  flex: 1;
+  color: var(--muted);
+  font-size: .75rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-decoration: none;
+}
+.info-link:hover { color: var(--primary); text-decoration: underline; }
+
+.btn-icon {
+  background: var(--bg2);
+  border: 1px solid var(--border-md);
+  border-radius: 5px;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: .75rem;
+  padding: 2px 7px;
+  flex-shrink: 0;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  transition: background .12s, border-color .12s, color .12s;
+  font-family: inherit;
+}
+.btn-icon:hover {
+  background: var(--primary-lt);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+/* ─── Asunto row (label + copy) ──────────────────────────────── */
+.asunto-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+.asunto-row label { margin-bottom: 0; }
+
+/* ─── Action buttons extra ───────────────────────────────────── */
+.btn-gmail     { background: rgba(234,67,53,.18);  color: #f28b82; }
+.btn-gmail:hover { opacity: 1; background: rgba(234,67,53,.32); }
+.btn-whatsapp  { background: rgba(37,211,102,.15); color: #6ee7a0; }
+.btn-whatsapp:hover { opacity: 1; background: rgba(37,211,102,.28); }
+
 /* ─── Responsive ─────────────────────────────────────────────── */
 @media (max-width: 600px) {
   .card { padding: 18px 16px; }
