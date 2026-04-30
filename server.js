@@ -27,7 +27,7 @@ app.post('/api/buscar', async (req, res) => {
     const empresas = await buscarEmpresas(nichoNorm, zonaNorm, nombresYaBuscados);
 
     if (empresas && empresas.error === 'sin_web_search') {
-      return res.json({ error: 'sin_web_search', sugerencias: empresas.sugerencias || [], zona: zonaNorm });
+      return res.json({ error: 'sin_web_search', sugerencias: empresas.sugerencias || [], guardadasPrevias, zona: zonaNorm });
     }
 
     if (!Array.isArray(empresas) || !empresas.length) return res.status(404).json({ error: 'No se encontraron empresas. Intentá con otro nicho.' });

@@ -58,7 +58,11 @@ async function buscar() {
     if (!res.ok) throw new Error(data.error || 'Error desconocido');
 
     if (data.error === 'sin_web_search') {
+      _nicho = nicho;
+      _zona  = data.zona || zonaSeleccionada;
+      _guardadas = data.guardadasPrevias || [];
       renderSinWebSearch(nicho, data.sugerencias || []);
+      renderGuardadas(_guardadas);
       return;
     }
 
